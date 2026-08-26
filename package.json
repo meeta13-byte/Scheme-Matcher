@@ -1,0 +1,13 @@
+{
+  "name": "scheme-matcher",
+  "version": "1.0.0",
+  "description": "Full-stack government scheme matcher for India — zero-dependency Node backend + vanilla JS frontend.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}
