@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scheme Matcher — India Welfare Matcher</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container header-container">
+      <div class="logo-area">
+        <span class="flag-stripe stripe-saffron"></span>
+        <span class="flag-stripe stripe-white"></span>
+        <span class="flag-stripe stripe-green"></span>
+        <div class="logo-text">
+          <h1>Scheme Matcher</h1>
+          <p>Government Scheme & Scholarship Matcher for India</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-btn active" data-tab="match-tab">Find Schemes</button>
+        <button class="nav-btn" data-tab="browse-tab">Browse All</button>
+        <button class="nav-btn" data-tab="bookmarks-tab">Bookmarks (<span id="bookmark-count">0</span>)</button>
+        <button class="nav-btn" data-tab="admin-tab">Admin Portal</button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="stats-bar">
+    <div class="container stats-container">
+      <span class="stat-item">🟢 Live Active Schemes: <strong id="stat-active-count">0</strong></span>
+      <span class="stat-item">📂 Welfare Domains: <strong id="stat-domain-count">0</strong></span>
+      <span class="stat-item">🗓️ Last Reviewed: <strong id="stat-last-reviewed">-</strong></span>
+    </div>
+  </div>
+
+  <main class="container main-content">
+    <!-- TAB 1: MATCHING QUESTIONNAIRE -->
+    <section id="match-tab" class="tab-content active">
+      <div class="card-grid">
+        <div class="card form-card">
+          <h2>Find Schemes You Qualify For</h2>
+          <p class="subtitle">Fill out the questionnaire below. We will calculate match scores and filter schemes accordingly.</p>
+          
+          <form id="matcher-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="state">State / UT</label>
+                <select id="state" name="state" required>
+                  <!-- Populated dynamically -->
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="category">Social Category</label>
+                <select id="category" name="category" required>
+                  <option value="All">All / General</option>
+                  <option value="SC">Scheduled Caste (SC)</option>
+                  <option value="ST">Scheduled Tribe (ST)</option>
+                  <option value="OBC">Other Backward Class (OBC)</option>
+                  <option value="Minority">Minority Communities</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="gender">Gender</label>
+                <select id="gender" name="gender" required>
+                  <option value="Any">Any Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="age">Age (Years)</label>
+                <input type="number" id="age" name="age" min="0" max="120" placeholder="e.g. 20" required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="income">Annual Household Income (₹)</label>
+                <input type="number" id="income" name="income" min="0" placeholder="e.g. 150000" required>
+              </div>
+              <div class="form-group">
+                <label for="disability">Specially-Abled (Disability 40%+)?</label>
+                <div class="radio-group">
+                  <label><input type="radio" name="disability" value="yes"> Yes</label>
+                  <label><input type="radio" name="disability" value="no" checked> No</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="occupation">Occupation</label>
+                <select id="occupation" name="occupation" required>
+                  <option value="Any">Any / Other</option>
+                  <option value="Farmer">Farmer</option>
+                  <option value="Student">Student</option>
+                  <option value="Unemployed">Unemployed</option>
+                  <option value="Employed">Employed / Salaried</option>
+                  <option value="Self-employed">Self-employed</option>
+                  <option value="Unorganised worker">Unorganised Sector Worker</option>
+                  <option value="Artisan / Craftsperson">Artisan / Craftsperson</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="education">Highest Education Level</label>
+                <select id="education" name="education" required>
+                  <option value="Any">Any / Other</option>
+                  <option value="School">School Education (Class 1-12)</option>
+                  <option value="ITI">ITI Course</option>
+                  <option value="Diploma">Diploma Course</option>
+                  <option value="UG">Undergraduate (UG)</option>
+                  <option value="PG">Postgraduate (PG)</option>
+                  <option value="PhD">Doctoral / PhD</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="domain">Domain of Interest (Optional)</label>
+              <select id="domain" name="domain">
+                <option value="">All Welfare Domains</option>
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block">Search Matching Schemes</button>
+          </form>
+        </div>
+
+        <div class="results-area">
+          <div class="results-header">
+            <h2>Your Matches</h2>
+            <span id="results-count" class="badge">0 schemes found</span>
+          </div>
+          <div id="results-list" class="results-list">
+            <div class="empty-state">
+              <span class="icon">🔍</span>
+              <p>Fill out the questionnaire and click search to view matching government schemes.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: BROWSE ALL -->
+    <section id="browse-tab" class="tab-content">
+      <div class="search-filters">
+        <input type="text" id="search-q" placeholder="Search schemes by name, keyword, or ministry...">
+        <select id="filter-domain">
+          <option value="">All Domains</option>
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+      <div id="browse-list" class="schemes-grid">
+        <!-- Filled dynamically -->
+      </div>
+    </section>
+
+    <!-- TAB 3: BOOKMARKS -->
+    <section id="bookmarks-tab" class="tab-content">
+      <div class="results-header">
+        <h2>Your Saved Schemes</h2>
+        <p>Bookmarked schemes are saved locally on this device.</p>
+      </div>
+      <div id="bookmarks-list" class="schemes-grid">
+        <div class="empty-state">
+          <span class="icon">🔖</span>
+          <p>You haven't bookmarked any schemes yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: ADMIN PORTAL -->
+    <section id="admin-tab" class="tab-content">
+      <div id="admin-login-view" class="card admin-login-card">
+        <h2>Admin Authentication</h2>
+        <p>Login to add, edit, or delete schemes, and view system logs.</p>
+        <form id="admin-login-form">
+          <div class="form-group">
+            <label for="admin-password">Admin Password</label>
+            <input type="password" id="admin-password" placeholder="Enter password (default: admin123)" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Login</button>
+          <div id="login-error" class="error-text hidden"></div>
+        </form>
+      </div>
+
+      <div id="admin-dashboard-view" class="hidden">
+        <div class="admin-header">
+          <h2>Admin Dashboard</h2>
+          <div class="admin-actions">
+            <button id="btn-add-scheme" class="btn btn-primary">+ Add New Scheme</button>
+            <button id="btn-view-audit" class="btn btn-secondary">Audit Logs</button>
+            <button id="btn-bulk-import" class="btn btn-secondary">Bulk Import</button>
+            <button id="btn-logout" class="btn btn-danger">Logout</button>
+          </div>
+        </div>
+
+        <div class="admin-table-container">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Ministry / Level</th>
+                <th>Domain</th>
+                <th>Benefit</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-schemes-tbody">
+              <!-- Loaded dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: ADD/EDIT SCHEME -->
+  <div id="scheme-modal" class="modal hidden">
+    <div class="modal-content">
+      <span class="close-btn" id="modal-close">&times;</span>
+      <h2 id="modal-title">Add New Scheme</h2>
+      <form id="scheme-form">
+        <input type="hidden" id="scheme-form-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="f-name">Scheme Name *</label>
+            <input type="text" id="f-name" required>
+          </div>
+          <div class="form-group">
+            <label for="f-ministry">Ministry / Department *</label>
+            <input type="text" id="f-ministry" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="f-shortDesc">Short Description *</label>
+          <textarea id="f-shortDesc" rows="2" required></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="f-level">Administrative Level</label>
+            <select id="f-level">
+              <option value="Central">Central (National)</option>
+              <option value="State">State Government</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="f-domain">Domain *</label>
+            <select id="f-domain" required>
+              <!-- Filled dynamically -->
+            </select>
+          </div>
+        </div>
+
+        <fieldset>
+          <legend>Eligibility Criteria</legend>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-states">States (Comma separated or "All")</label>
+              <input type="text" id="f-states" placeholder='e.g. All, Bihar, Uttar Pradesh' value="All">
+            </div>
+            <div class="form-group">
+              <label for="f-category">Social Category (Comma separated or "All")</label>
+              <input type="text" id="f-category" placeholder='e.g. SC, OBC, Minorities or All' value="All">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-gender">Gender</label>
+              <select id="f-gender">
+                <option value="Any">Any / Both</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="f-disability">Disability Required?</label>
+              <select id="f-disability">
+                <option value="either">No Specific Requirement (Either)</option>
+                <option value="true">Yes (Must be specially-abled)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-minAge">Min Age (Years)</label>
+              <input type="number" id="f-minAge" placeholder="None">
+            </div>
+            <div class="form-group">
+              <label for="f-maxAge">Max Age (Years)</label>
+              <input type="number" id="f-maxAge" placeholder="None">
+            </div>
+            <div class="form-group">
+              <label for="f-incomeMax">Max Annual Income Ceiling (₹)</label>
+              <input type="number" id="f-incomeMax" placeholder="None">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-education">Education Slabs (JSON Array or "Any")</label>
+              <input type="text" id="f-education" placeholder='e.g. ["School", "UG"] or "Any"' value="Any">
+            </div>
+            <div class="form-group">
+              <label for="f-occupation">Occupation Slabs (JSON Array or "Any")</label>
+              <input type="text" id="f-occupation" placeholder='e.g. ["Farmer", "Unemployed"] or "Any"' value="Any">
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Benefit & Application</legend>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-benefitType">Benefit Type</label>
+              <input type="text" id="f-benefitType" placeholder="e.g. Scholarship, Pension, Subsidy, Loan">
+            </div>
+            <div class="form-group">
+              <label for="f-benefit">Benefit Value</label>
+              <input type="text" id="f-benefit" placeholder="e.g. ₹12,000/year, Full tuition fee waiver">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="f-applyUrl">Official Apply URL</label>
+              <input type="url" id="f-applyUrl" placeholder="https://...">
+            </div>
+            <div class="form-group">
+              <label for="f-deadline">Deadline / Status</label>
+              <input type="text" id="f-deadline" value="Rolling" placeholder="e.g. 31 Dec 2026, Rolling">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="f-documents">Required Documents (JSON list)</label>
+            <input type="text" id="f-documents" placeholder='e.g. ["Aadhaar", "Income Certificate"]' value="[]">
+          </div>
+          <div class="form-group">
+            <label for="f-steps">Application Steps (JSON list of strings)</label>
+            <textarea id="f-steps" rows="2" placeholder='e.g. ["Apply on NSP", "College verification"]'>[]</textarea>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="btn btn-primary btn-block">Save Scheme</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: AUDIT LOGS -->
+  <div id="audit-modal" class="modal hidden">
+    <div class="modal-content large">
+      <span class="close-btn" id="audit-modal-close">&times;</span>
+      <h2>System Audit Logs (Last 100 Actions)</h2>
+      <div class="audit-log-container">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Action Details</th>
+            </tr>
+          </thead>
+          <tbody id="audit-logs-tbody">
+            <!-- Loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: BULK IMPORT -->
+  <div id="bulk-modal" class="modal hidden">
+    <div class="modal-content">
+      <span class="close-btn" id="bulk-modal-close">&times;</span>
+      <h2>Bulk Import Schemes (JSON Array)</h2>
+      <p class="subtitle">Paste a JSON array containing scheme objects. Each object should follow the database format.</p>
+      <form id="bulk-import-form">
+        <div class="form-group">
+          <textarea id="bulk-json-input" rows="12" placeholder='[
+  {
+    "name": "Scheme Name",
+    "shortDesc": "Description",
+    ...
+  }
+]' required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Import Schemes</button>
+        <div id="bulk-error" class="error-text hidden"></div>
+        <div id="bulk-success" class="success-text hidden"></div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="container footer-container">
+      <p>&copy; 2026 Scheme Matcher. All Rights Reserved.</p>
+      <p class="disclaimer">⚠️ Disclaimer: Data presented here is for illustrative and matching demo purposes. Please check the official government websites before applying for any scheme.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
