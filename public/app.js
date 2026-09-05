@@ -396,7 +396,7 @@ function renderSchemeCard(scheme, hasScore) {
       
       <button class="collapsible-trigger" onclick="toggleDetailsCollapse(this)">Show Requirements ↓</button>
       
-      <a href="${scheme.applyUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Apply Now ↗</a>
+      <a href="${scheme.applyUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" title="Go directly to scheme page">Apply Now ↗</a>
     </div>
 
     <div class="scheme-details-content hidden">
