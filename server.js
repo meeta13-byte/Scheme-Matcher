@@ -1,28 +1,54 @@
-// Scheme Matcher — backend API server
-// Zero external dependencies: uses only Node's built-in http, node:sqlite and node:crypto.
+// Scheme Matcher — Production-Ready Backend API Server
+// Zero external dependencies: uses only Node's built-in http, https, node:sqlite, node:crypto, node:fs, node:path.
 // Requires Node.js v22.5+ (for the built-in node:sqlite module).
-//
-// Run:   node server.js
-// Then:  open http://localhost:3000
 
 const http = require('node:http');
+const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 
-const PORT = process.env.PORT || 3000;
+// ---------------------------------------------------------------------------
+// ENVIRONMENT CONFIGURATION
+// ---------------------------------------------------------------------------
+function loadEnv() {
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx > 0) {
+        const key = trimmed.slice(0, idx).trim();
+        const val = trimmed.slice(idx + 1).trim();
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  }
+}
+loadEnv();
+
+const PORT = parseInt(process.env.PORT, 10) || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_PATH = path.join(DATA_DIR, 'scheme-matcher.db');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // ---------------------------------------------------------------------------
-// DATABASE
+// DATABASE INITIALIZATION & MIGRATIONS
 // ---------------------------------------------------------------------------
 const db = new DatabaseSync(DB_PATH);
+db.exec('PRAGMA foreign_keys = ON;');
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS schemes (
     id TEXT PRIMARY KEY,
@@ -52,29 +78,123 @@ db.exec(`
     created_at TEXT,
     updated_at TEXT
   );
+
   CREATE TABLE IF NOT EXISTS admin_users (
     username TEXT PRIMARY KEY,
     salt TEXT NOT NULL,
     hash TEXT NOT NULL
   );
+
   CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ts TEXT NOT NULL,
     message TEXT NOT NULL
   );
+
   CREATE TABLE IF NOT EXISTS bookmarks (
     device_id TEXT NOT NULL,
     scheme_id TEXT NOT NULL,
     created_at TEXT NOT NULL,
     PRIMARY KEY (device_id, scheme_id)
   );
+
   CREATE TABLE IF NOT EXISTS secrets (
     k TEXT PRIMARY KEY,
     v TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    google_id TEXT UNIQUE,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    picture TEXT,
+    role TEXT DEFAULT 'student',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    state TEXT,
+    age INTEGER,
+    gender TEXT,
+    category TEXT,
+    income INTEGER,
+    disability TEXT,
+    occupation TEXT,
+    education TEXT,
+    domain TEXT,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS user_bookmarks (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scheme_id TEXT NOT NULL REFERENCES schemes(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, scheme_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS applications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scheme_id TEXT NOT NULL REFERENCES schemes(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'Not Started',
+    applied_at TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS documents (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doc_type TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    mime_type TEXT NOT NULL,
+    uploaded_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT DEFAULT 'info',
+    is_read INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS service_requests (
+    id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    type TEXT NOT NULL,
+    data TEXT NOT NULL,
+    status TEXT DEFAULT 'received',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS feedback (
+    id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    rating INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_user_bookmarks_user ON user_bookmarks(user_id);
+  CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_id);
+  CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
+  CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+  CREATE INDEX IF NOT EXISTS idx_schemes_domain ON schemes(domain);
+  CREATE INDEX IF NOT EXISTS idx_schemes_active ON schemes(active);
 `);
 
-// server secret used to sign auth tokens — generated once, persisted in DB
+// ---------------------------------------------------------------------------
+// SERVER SECRET & AUTH
+// ---------------------------------------------------------------------------
 function getServerSecret() {
   const row = db.prepare('SELECT v FROM secrets WHERE k = ?').get('token_secret');
   if (row) return row.v;
@@ -84,19 +204,19 @@ function getServerSecret() {
 }
 const SERVER_SECRET = getServerSecret();
 
-// seed default admin user if none exists
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
+
 if (!db.prepare('SELECT 1 FROM admin_users LIMIT 1').get()) {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = hashPassword(DEFAULT_ADMIN_PASSWORD, salt);
   db.prepare('INSERT INTO admin_users (username, salt, hash) VALUES (?, ?, ?)').run('admin', salt, hash);
-  console.log(`Seeded default admin user (username: admin, password: ${DEFAULT_ADMIN_PASSWORD})`);
+  console.log(`[AUTH] Seeded default admin user (username: admin, password: ${DEFAULT_ADMIN_PASSWORD})`);
 }
 
 // ---------------------------------------------------------------------------
-// SEED SCHEME DATA (runs once — only if table is empty)
+// SEED SCHEME DATA (Preserved from original dataset)
 // ---------------------------------------------------------------------------
 function mk(o) {
   const now = new Date().toISOString();
@@ -145,6 +265,7 @@ const insertStmt = db.prepare(`
   INSERT INTO schemes (id,name,short_desc,ministry,level,domain,states,category,gender,min_age,max_age,income_max,education,occupation,disability,benefit_type,benefit,documents,steps,apply_url,source_url,last_verified,deadline,active,created_at,updated_at)
   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 `);
+
 const countRow = db.prepare('SELECT COUNT(*) as c FROM schemes').get();
 if (countRow.c === 0) {
   for (const s of SEED_SCHEMES) {
@@ -157,49 +278,67 @@ if (countRow.c === 0) {
       s.applyUrl, s.sourceUrl, s.lastVerified, s.deadline, s.active, s.createdAt, s.updatedAt
     );
   }
-  console.log(`Seeded ${SEED_SCHEMES.length} schemes into the database.`);
-} else {
-  // Sync / update existing schemes with direct scheme URLs if currently pointing to generic portals
-  const updateUrlStmt = db.prepare('UPDATE schemes SET apply_url = ? WHERE id = ?');
-  let updatedCount = 0;
-  for (const s of SEED_SCHEMES) {
-    const current = db.prepare('SELECT apply_url FROM schemes WHERE id = ?').get(s.id);
-    if (current && (current.apply_url !== s.applyUrl)) {
-      if (!current.apply_url.includes('/schemes/') || current.apply_url.endsWith('myscheme.gov.in') || current.apply_url.endsWith('scholarships.gov.in')) {
-        updateUrlStmt.run(s.applyUrl, s.id);
-        updatedCount++;
-      }
-    }
-  }
-  if (updatedCount > 0) {
-    console.log(`Updated ${updatedCount} schemes to direct scheme URLs.`);
-  }
+  console.log(`[SEED] Seeded ${SEED_SCHEMES.length} schemes into the database.`);
 }
 
 // ---------------------------------------------------------------------------
-// HELPERS
+// DATA HELPERS & REFERENCE CONSTANTS
 // ---------------------------------------------------------------------------
+function safeJSONParse(str, fallback) {
+  if (!str) return fallback;
+  try { return JSON.parse(str); }
+  catch (e) { return fallback; }
+}
+
 function rowToScheme(r) {
   return {
-    id: r.id, name: r.name, shortDesc: r.short_desc, ministry: r.ministry, level: r.level, domain: r.domain,
-    states: JSON.parse(r.states), category: JSON.parse(r.category), gender: r.gender,
-    minAge: r.min_age, maxAge: r.max_age, incomeMax: r.income_max,
-    education: JSON.parse(r.education), occupation: JSON.parse(r.occupation), disability: r.disability,
-    benefitType: r.benefit_type, benefit: r.benefit,
-    documents: JSON.parse(r.documents), steps: JSON.parse(r.steps),
-    applyUrl: r.apply_url, sourceUrl: r.source_url, lastVerified: r.last_verified, deadline: r.deadline,
-    active: !!r.active, createdAt: r.created_at, updatedAt: r.updated_at,
+    id: r.id,
+    name: r.name,
+    shortDesc: r.short_desc,
+    ministry: r.ministry,
+    level: r.level,
+    domain: r.domain,
+    states: safeJSONParse(r.states, 'All'),
+    category: safeJSONParse(r.category, 'All'),
+    gender: r.gender,
+    minAge: r.min_age,
+    maxAge: r.max_age,
+    incomeMax: r.income_max,
+    education: safeJSONParse(r.education, 'Any'),
+    occupation: safeJSONParse(r.occupation, 'Any'),
+    disability: r.disability,
+    benefitType: r.benefit_type,
+    benefit: r.benefit,
+    documents: safeJSONParse(r.documents, []),
+    steps: safeJSONParse(r.steps, []),
+    applyUrl: r.apply_url,
+    sourceUrl: r.source_url,
+    lastVerified: r.last_verified,
+    deadline: r.deadline,
+    active: !!r.active,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
   };
 }
+
 function getAllSchemeRows() {
   return db.prepare('SELECT * FROM schemes ORDER BY name ASC').all().map(rowToScheme);
 }
+
 function getSchemeById(id) {
   const r = db.prepare('SELECT * FROM schemes WHERE id = ?').get(id);
   return r ? rowToScheme(r) : null;
 }
+
 function logAudit(message) {
   db.prepare('INSERT INTO audit_log (ts, message) VALUES (?, ?)').run(new Date().toISOString(), message);
+}
+
+function createNotification(userId, title, message, type = 'info') {
+  const id = 'N' + crypto.randomBytes(6).toString('hex');
+  db.prepare('INSERT INTO notifications (id, user_id, title, message, type, is_read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)')
+    .run(id, userId, title, message, type, new Date().toISOString());
+  return id;
 }
 
 const DOMAINS = [
@@ -213,77 +352,275 @@ const DOMAINS = [
   { id: 'pension', en: 'Pension & Social Security', hi: 'पेंशन व सामाजिक सुरक्षा' },
   { id: 'disability', en: 'Disability Support', hi: 'दिव्यांग सहायता' },
 ];
-const STATES = ["All India","Andhra Pradesh","Assam","Bihar","Chhattisgarh","Delhi","Gujarat","Haryana","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Odisha","Punjab","Rajasthan","Tamil Nadu","Telangana","Uttar Pradesh","West Bengal"];
 
-// ---- matching engine (mirrors the client-side logic, now authoritative on the server) ----
+const STATES = [
+  "All India", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+  "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
+  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
+  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
+  "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"
+];
+
+// ---------------------------------------------------------------------------
+// DETERMINISTIC MATCHING ENGINE
+// ---------------------------------------------------------------------------
 function computeMatch(scheme, a) {
-  if (scheme.states !== 'All' && a.state && Array.isArray(scheme.states) && !scheme.states.includes(a.state)) return null;
-  if (scheme.category !== 'All' && a.category && Array.isArray(scheme.category) && !scheme.category.includes(a.category)) return null;
-  if (scheme.gender !== 'Any' && a.gender && scheme.gender !== a.gender) return null;
-  if (a.age) {
-    const age = parseInt(a.age, 10);
-    if (scheme.minAge != null && age < scheme.minAge) return null;
-    if (scheme.maxAge != null && age > scheme.maxAge) return null;
-  }
-  if (a.income !== undefined && a.income !== '' && a.income != null && scheme.incomeMax != null) {
-    if (parseInt(a.income, 10) > scheme.incomeMax) return null;
-  }
-  if (scheme.disability === 'true' && a.disability !== 'yes') return null;
-
-  let total = 0, matched = 0;
+  let earnedPoints = 0;
+  let maxPoints = 0;
   const reasons = [];
-  function bump(cond, label) { total++; if (cond) { matched++; reasons.push(label); } }
+  const missing = [];
 
-  if (scheme.education !== 'Any' && Array.isArray(scheme.education) && a.education) {
-    bump(scheme.education.includes(a.education), 'Education level matched');
+  // 1. State Criteria (Weight: 20)
+  maxPoints += 20;
+  if (scheme.states === 'All' || scheme.states === '"All"' || (Array.isArray(scheme.states) && scheme.states.includes('All India'))) {
+    earnedPoints += 20;
+    reasons.push('Open to all Indian States & UTs');
+  } else if (a.state && Array.isArray(scheme.states)) {
+    if (scheme.states.includes(a.state)) {
+      earnedPoints += 20;
+      reasons.push(`State matches: Eligible for residents of ${a.state}`);
+    } else {
+      missing.push(`State restriction: Scheme is for ${scheme.states.join(', ')} (you selected ${a.state})`);
+    }
+  } else if (!a.state) {
+    earnedPoints += 10;
+    reasons.push('State requirement pending');
+  } else {
+    missing.push(`State restriction: Specific states only`);
   }
-  if (scheme.occupation !== 'Any' && Array.isArray(scheme.occupation) && a.occupation) {
-    bump(scheme.occupation.includes(a.occupation), 'Occupation matched');
+
+  // 2. Category Criteria (Weight: 25)
+  maxPoints += 25;
+  if (scheme.category === 'All' || scheme.category === '"All"' || (Array.isArray(scheme.category) && scheme.category.includes('All'))) {
+    earnedPoints += 25;
+    reasons.push('Open to all social categories (General, SC, ST, OBC, Minorities)');
+  } else if (a.category && Array.isArray(scheme.category)) {
+    if (scheme.category.includes(a.category)) {
+      earnedPoints += 25;
+      reasons.push(`Social category matched: Dedicated to ${a.category} category`);
+    } else {
+      missing.push(`Category requirement: Targeted to ${scheme.category.join(', ')} (you selected ${a.category})`);
+    }
+  } else if (!a.category) {
+    earnedPoints += 12;
+  } else {
+    missing.push(`Category requirement: Specific category required`);
   }
+
+  // 3. Gender Criteria (Weight: 15)
+  maxPoints += 15;
+  if (scheme.gender === 'Any') {
+    earnedPoints += 15;
+    reasons.push('No gender restrictions (Any gender eligible)');
+  } else if (a.gender) {
+    if (scheme.gender === a.gender) {
+      earnedPoints += 15;
+      reasons.push(`Gender requirement met: Targeted for ${a.gender} candidates`);
+    } else {
+      missing.push(`Gender restriction: Scheme is specifically reserved for ${scheme.gender} candidates`);
+    }
+  } else {
+    earnedPoints += 8;
+  }
+
+  // 4. Age Window (Weight: 15)
+  maxPoints += 15;
+  if (scheme.minAge == null && scheme.maxAge == null) {
+    earnedPoints += 15;
+    reasons.push('No specific age barrier');
+  } else if (a.age !== undefined && a.age !== '' && a.age !== null) {
+    const age = parseInt(a.age, 10);
+    const minOk = scheme.minAge == null || age >= scheme.minAge;
+    const maxOk = scheme.maxAge == null || age <= scheme.maxAge;
+    if (minOk && maxOk) {
+      earnedPoints += 15;
+      reasons.push(`Age eligibility verified: Age ${age} is within ${scheme.minAge || 0} to ${scheme.maxAge || 'no limit'} years`);
+    } else if (!minOk) {
+      missing.push(`Age below limit: Minimum age requirement is ${scheme.minAge} years (current age: ${age})`);
+    } else {
+      missing.push(`Age exceeds limit: Maximum age cutoff is ${scheme.maxAge} years (current age: ${age})`);
+    }
+  } else {
+    earnedPoints += 7;
+  }
+
+  // 5. Income Ceiling (Weight: 15)
+  maxPoints += 15;
+  if (scheme.incomeMax == null) {
+    earnedPoints += 15;
+    reasons.push('No household income ceiling');
+  } else if (a.income !== undefined && a.income !== '' && a.income !== null) {
+    const income = parseInt(a.income, 10);
+    if (income <= scheme.incomeMax) {
+      earnedPoints += 15;
+      reasons.push(`Within income ceiling: ₹${income.toLocaleString()} <= ₹${scheme.incomeMax.toLocaleString()}/year`);
+    } else {
+      missing.push(`Income ceiling exceeded: Limit is ₹${scheme.incomeMax.toLocaleString()}/year (entered ₹${income.toLocaleString()})`);
+    }
+  } else {
+    earnedPoints += 7;
+  }
+
+  // 6. Disability Constraint (Weight: 10)
+  maxPoints += 10;
+  if (scheme.disability === 'true') {
+    if (a.disability === 'yes') {
+      earnedPoints += 10;
+      reasons.push('Special quota: Meets 40%+ disability criteria');
+    } else {
+      missing.push('Scheme exclusively requires 40%+ disability certificate');
+    }
+  } else {
+    earnedPoints += 10;
+    if (a.disability === 'yes') {
+      reasons.push('Open to specially-abled persons');
+    }
+  }
+
+  // 7. Education Match (Weight: 10)
+  maxPoints += 10;
+  if (scheme.education === 'Any' || scheme.education === '"Any"') {
+    earnedPoints += 10;
+  } else if (a.education && Array.isArray(scheme.education)) {
+    if (scheme.education.includes(a.education)) {
+      earnedPoints += 10;
+      reasons.push(`Education level matched: Accepted course level (${a.education})`);
+    } else {
+      missing.push(`Education level: Requires ${scheme.education.join(', ')} (you selected ${a.education})`);
+    }
+  } else {
+    earnedPoints += 5;
+  }
+
+  // 8. Occupation Match (Weight: 10)
+  maxPoints += 10;
+  if (scheme.occupation === 'Any' || scheme.occupation === '"Any"') {
+    earnedPoints += 10;
+  } else if (a.occupation && Array.isArray(scheme.occupation)) {
+    if (scheme.occupation.includes(a.occupation)) {
+      earnedPoints += 10;
+      reasons.push(`Occupation matched: Target occupation (${a.occupation})`);
+    } else {
+      missing.push(`Occupation requirement: Requires ${scheme.occupation.join(', ')}`);
+    }
+  } else {
+    earnedPoints += 5;
+  }
+
+  // 9. Domain Alignment (Weight: 5 bonus)
   if (a.domain) {
-    bump(scheme.domain === a.domain, 'Domain of interest matched');
+    maxPoints += 5;
+    if (scheme.domain === a.domain) {
+      earnedPoints += 5;
+      reasons.push(`Preferred domain matched: ${scheme.domain}`);
+    }
   }
-  if (scheme.category !== 'All' && a.category) reasons.unshift(`Category: ${a.category} ✓`);
-  if (scheme.states !== 'All' && a.state) reasons.unshift(`State: ${a.state} ✓`);
-  if (scheme.incomeMax != null && a.income) reasons.unshift('Within income ceiling ✓');
-  if (scheme.gender !== 'Any' && a.gender) reasons.unshift(`Gender: ${a.gender} ✓`);
-  if (scheme.disability === 'true' && a.disability === 'yes') reasons.unshift('Disability criterion ✓');
 
-  const score = total === 0 ? 100 : Math.round((matched / total) * 100);
-  return { score, reasons };
+  const score = Math.min(100, Math.max(0, Math.round((earnedPoints / maxPoints) * 100)));
+  const isFullyEligible = missing.length === 0;
+
+  return {
+    score,
+    isFullyEligible,
+    reasons,
+    missing,
+  };
 }
 
-// ---- token auth (stateless HMAC-signed tokens, ~express-JWT-lite) ----
-function base64url(buf) { return Buffer.from(buf).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+// ---------------------------------------------------------------------------
+// TOKEN AUTHENTICATION (HMAC-SHA256 JWT)
+// ---------------------------------------------------------------------------
+function base64url(buf) {
+  return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 function signToken(payload) {
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = base64url(JSON.stringify(payload));
   const sig = base64url(crypto.createHmac('sha256', SERVER_SECRET).update(`${header}.${body}`).digest());
   return `${header}.${body}.${sig}`;
 }
+
 function verifyToken(token) {
   try {
     const [header, body, sig] = token.split('.');
+    if (!header || !body || !sig) return null;
     const expected = base64url(crypto.createHmac('sha256', SERVER_SECRET).update(`${header}.${body}`).digest());
     if (sig !== expected) return null;
-    const payload = JSON.parse(Buffer.from(body.replace(/-/g,'+').replace(/_/g,'/'), 'base64').toString());
+    const payload = JSON.parse(Buffer.from(body.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
     if (payload.exp && Date.now() > payload.exp) return null;
     return payload;
-  } catch (e) { return null; }
+  } catch (e) {
+    return null;
+  }
 }
-function requireAdmin(req) {
+
+function getAuthUser(req) {
   const auth = req.headers['authorization'] || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return null;
-  const payload = verifyToken(token);
+  return verifyToken(token);
+}
+
+function requireAdmin(req) {
+  const payload = getAuthUser(req);
   if (!payload || payload.role !== 'admin') return null;
   return payload;
 }
 
+function requireUser(req) {
+  const payload = getAuthUser(req);
+  if (!payload || !payload.sub) return null;
+  return payload;
+}
+
 // ---------------------------------------------------------------------------
-// HTTP SERVER
+// GOOGLE ID TOKEN VERIFICATION
 // ---------------------------------------------------------------------------
-const MIME = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.json':'application/json', '.svg':'image/svg+xml', '.png':'image/png' };
+function verifyGoogleIdTokenOnline(idToken) {
+  return new Promise((resolve, reject) => {
+    const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
+    https.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (res.statusCode !== 200 || parsed.error_description || parsed.error) {
+            return reject(new Error(parsed.error_description || parsed.error || 'Google token validation failed'));
+          }
+          if (GOOGLE_CLIENT_ID && parsed.aud !== GOOGLE_CLIENT_ID) {
+            return reject(new Error('Google Client ID mismatch'));
+          }
+          if (parsed.iss !== 'accounts.google.com' && parsed.iss !== 'https://accounts.google.com') {
+            return reject(new Error('Invalid token issuer'));
+          }
+          if (parsed.email_verified !== 'true' && parsed.email_verified !== true) {
+            return reject(new Error('Google email is not verified'));
+          }
+          resolve(parsed);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// HTTP HELPERS & BODY PARSING
+// ---------------------------------------------------------------------------
+const MIME = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.pdf': 'application/pdf',
+};
 
 function sendJSON(res, status, data) {
   const body = JSON.stringify(data);
@@ -296,34 +633,53 @@ function sendJSON(res, status, data) {
   });
   res.end(body);
 }
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let chunks = [];
+    const chunks = [];
     let size = 0;
-    req.on('data', c => { size += c.length; if (size > 2_000_000) req.destroy(); chunks.push(c); });
+    req.on('data', c => {
+      size += c.length;
+      if (size > 10_000_000) { // 10MB safety ceiling for base64 file payloads
+        req.destroy();
+        return reject(new Error('Payload too large'));
+      }
+      chunks.push(c);
+    });
     req.on('end', () => {
       if (!chunks.length) return resolve({});
-      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
-      catch (e) { reject(new Error('Invalid JSON body')); }
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch (e) {
+        reject(new Error('Invalid JSON body'));
+      }
     });
     req.on('error', reject);
   });
 }
+
 function serveStatic(req, res, pathname) {
   let filePath = pathname === '/' ? '/index.html' : pathname;
   const full = path.join(PUBLIC_DIR, filePath);
-  if (!full.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
+  if (!full.startsWith(PUBLIC_DIR)) {
+    res.writeHead(403);
+    return res.end('Forbidden');
+  }
+
   fs.readFile(full, (err, data) => {
     if (err) {
-      // SPA fallback to index.html for non-file routes
       if (!path.extname(filePath)) {
         return fs.readFile(path.join(PUBLIC_DIR, 'index.html'), (e2, d2) => {
-          if (e2) { res.writeHead(404); return res.end('Not found'); }
+          if (e2) {
+            res.writeHead(404);
+            return res.end('Not found');
+          }
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end(d2);
         });
       }
-      res.writeHead(404); return res.end('Not found');
+      res.writeHead(404);
+      return res.end('Not found');
     }
     const ext = path.extname(full);
     res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
@@ -331,19 +687,214 @@ function serveStatic(req, res, pathname) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// AI ASSISTANT & VOICE GUIDANCE ENGINE
+// ---------------------------------------------------------------------------
+function generateAIResponse(query) {
+  const q = (query || '').toLowerCase().trim();
+  const allSchemes = getAllSchemeRows().filter(s => s.active);
+
+  // 1. GREETINGS & INTRO
+  if (!q || /^(hi|hello|hey|namaste|greetings|good\s+(morning|afternoon|evening)|who are you)/i.test(q)) {
+    return {
+      reply: `**Namaste! I am SchemeMitra**, your AI & Voice Assistant for Indian government welfare schemes and scholarships.\n\nHere is what I can do for you:\n- 🎯 **Find Scholarships**: Tell me your state, category, or course.\n- 🧭 **Guide You**: Say *"Start guided tour"* to explore all features.\n- 📂 **Documents**: Ask about required certificates for any scheme.\n- 🚀 **Quick Actions**: Say *"Open tracker"*, *"Open vault"*, or *"Show services"*.`,
+      voiceText: "Namaste! I am SchemeMitra, your AI and Voice Assistant. How can I help you today? You can ask me to find scholarships, check required documents, or say 'Start tour' to explore the website.",
+      action: null,
+      chips: ["Start guided tour 🧭", "Find scholarships for me 🎓", "What documents for NSP? 📄", "Open Services menu ⚡"]
+    };
+  }
+
+  // 2. GUIDED TOUR & WEBSITE OVERVIEW
+  if (/(tour|guided tour|guide me|walkthrough|how to use|show me around|overview|help me navigate|navigate)/i.test(q)) {
+    return {
+      reply: `### 🧭 Welcome to the Interactive Portal Tour!\n\nHere are the 4 main tools to help you secure scholarships:\n\n1. **🎯 Eligibility Matcher**: Use the form below to enter your state, caste, education, and family income. We rank the best schemes with an explainability breakdown.\n2. **⚡ Services Hub**: Access the top menu to view all quick services.\n3. **📋 Application Tracker**: Keep logs of your scholarship application numbers, dates, and verification progress.\n4. **🔒 Document Vault**: Upload and store your income certificate, caste certificate, Aadhaar, and marksheets safely.\n\n*Click below or say a command to jump directly into any section!*`,
+      voiceText: "Welcome to Government Scheme Matcher! I can guide you through our portal. First, use our Eligibility Matcher to discover scholarships tailored to your profile. Second, check the Services menu for your Application Tracker and Document Vault. Where would you like to start?",
+      action: "START_TOUR",
+      chips: ["Scroll to Matching Form", "Open Services Menu", "Open Application Tracker", "Open Document Vault"]
+    };
+  }
+
+  // 3. NAVIGATIONAL COMMANDS & ACTIONS
+  if (/(service|services|services menu|fancy services|menu)/i.test(q)) {
+    return {
+      reply: `✨ **Opening the Services Menu** for you right now!\n\nFrom here you can access:\n- 🎓 Scholarship Matching\n- 📋 Application Tracker\n- 🔒 Document Vault\n- 🔔 Eligibility Alerts\n- 👤 Student Profile`,
+      voiceText: "Opening the Services menu for you right now!",
+      action: "OPEN_SERVICES",
+      chips: ["Open Tracker", "Open Document Vault", "Check Alerts"]
+    };
+  }
+
+  if (/(track|tracker|application status|my applications|status of application)/i.test(q)) {
+    return {
+      reply: `📋 **Opening Application Tracker**!\n\nHere you can monitor all your scholarship submissions across portals like NSP, State E-Kalyan, or AICTE. Add application IDs, update verification stages, and keep notes.`,
+      voiceText: "Opening your Application Tracker modal right now.",
+      action: "OPEN_MODAL",
+      target: "tracker-modal",
+      chips: ["Open Document Vault", "Find more schemes", "Back to Home"]
+    };
+  }
+
+  if (/(vault|document vault|upload documents?|my documents?|files?|certificates?|storage)/i.test(q)) {
+    return {
+      reply: `🔒 **Opening Secure Document Vault**!\n\nYou can upload and organize essential files like your **Income Certificate**, **Caste Certificate**, **Aadhaar Card**, and **Marksheets**. Files remain private in your browser session.`,
+      voiceText: "Opening your secure Document Vault.",
+      action: "OPEN_MODAL",
+      target: "vault-modal",
+      chips: ["What documents for NSP?", "Open Tracker", "Find scholarships"]
+    };
+  }
+
+  if (/(alert|alerts|notification|notifications|deadline|closing date)/i.test(q)) {
+    return {
+      reply: `🔔 **Opening Eligibility Alerts & Deadlines**!\n\nStay on top of critical renewal dates, opening windows, and state scholarship disbursement alerts.`,
+      voiceText: "Opening your Eligibility Alerts and Deadlines.",
+      action: "OPEN_MODAL",
+      target: "alerts-modal",
+      chips: ["Open Services Menu", "Check Tracker", "Matching Form"]
+    };
+  }
+
+  if (/(profile|my profile|student profile|my account|details)/i.test(q)) {
+    return {
+      reply: `👤 **Opening Student Profile**!\n\nUpdate your demographic information, domicile state, academic level, and annual family income so your recommendations stay 100% accurate.`,
+      voiceText: "Opening your Student Profile.",
+      action: "OPEN_MODAL",
+      target: "profile-modal",
+      chips: ["Run Matcher", "Open Tracker", "Close"]
+    };
+  }
+
+  if (/(feedback|review|rating|suggest|contact)/i.test(q)) {
+    return {
+      reply: `💬 **Opening Feedback Form**!\n\nYour feedback helps us support more students across India. Share your thoughts or feature suggestions with our team!`,
+      voiceText: "Opening the Feedback form.",
+      action: "OPEN_MODAL",
+      target: "feedback-modal",
+      chips: ["Close", "Start guided tour"]
+    };
+  }
+
+  if (/(match|matching|finder|eligibility|find scheme|find scholarship|check eligible)/i.test(q)) {
+    return {
+      reply: `🎯 **Taking you to the Eligibility Matcher!**\n\nFill in your **State**, **Caste Category**, **Education Level**, and **Annual Family Income** in the form on the page, then click **'Find My Eligible Schemes'** for ranked recommendations.`,
+      voiceText: "Scrolling you down to the Scholarship Eligibility Matcher form.",
+      action: "SCROLL_TO_MATCH",
+      chips: ["What documents for NSP?", "Scholarships for OBC", "Scholarships for SC/ST", "Scholarships for Girls"]
+    };
+  }
+
+  // 4. DOCUMENT ADVISORY (COMMON SCHOLARSHIPS / NSP)
+  if (/(what documents?|document list|documents required|nsp documents?|certificate)/i.test(q)) {
+    return {
+      reply: `### 📄 Standard Documents Required for Indian Government Scholarships:\n\n1. **Aadhaar Card** (Linked with bank account)\n2. **Income Certificate** (Current financial year, issued by Revenue Department / Tehsildar)\n3. **Caste / Category Certificate** (For SC, ST, OBC non-creamy layer, or EWS)\n4. **Previous Academic Marksheet** (With minimum 50%–60% marks as required)\n5. **Bank Passbook** (Student's active savings account with IFSC code)\n6. **Bonafide Student Certificate** / College ID (From current enrolled school/institute)\n7. **Fee Receipt / Admission Letter** (For post-matric & technical degree schemes)\n\n*Tip: Store copies in your **Document Vault** for quick access when portals open!*`,
+      voiceText: "For government scholarships, you typically need your Aadhaar card, current income certificate, caste certificate if applicable, previous academic marksheet, bank passbook, and bonafide student certificate from your institute.",
+      action: null,
+      chips: ["Open Document Vault 🔒", "Find scholarships for me 🎓", "Start guided tour 🧭"]
+    };
+  }
+
+  // 5. CATEGORY & DEMOGRAPHIC FILTERING
+  if (/\b(obc|other backward)\b/i.test(q)) {
+    const obcSchemes = allSchemes.filter(s => Array.isArray(s.category) ? s.category.includes('OBC') : s.category === 'All');
+    const top = obcSchemes.slice(0, 3);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (Income limit: ₹${(s.incomeMax||0).toLocaleString('en-IN')})`).join('\n');
+    return {
+      reply: `### 🎓 Top Schemes for OBC Students:\n\n${list}\n\n👉 *Need full criteria? Click 'Run Matcher' below with OBC selected.*`,
+      voiceText: `Found ${obcSchemes.length} schemes supporting OBC students, including Post-Matric Scholarship for OBC and PM YASASVI.`,
+      action: null,
+      chips: ["Scroll to Matcher 🎯", "Documents required 📄", "Open Services ⚡"]
+    };
+  }
+
+  if (/\b(sc|st|scheduled caste|scheduled tribe)\b/i.test(q)) {
+    const scSchemes = allSchemes.filter(s => Array.isArray(s.category) ? (s.category.includes('SC') || s.category.includes('ST')) : s.category === 'All');
+    const top = scSchemes.slice(0, 3);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+    return {
+      reply: `### 🎓 Top Schemes for SC & ST Students:\n\n${list}\n\n👉 *Complete tuition assistance and maintenance allowances are provided.*`,
+      voiceText: `Found ${scSchemes.length} schemes for Scheduled Caste and Scheduled Tribe students, including Post-Matric SC and Top Class Education scheme.`,
+      action: null,
+      chips: ["Scroll to Matcher 🎯", "Open Document Vault 🔒", "What documents for NSP?"]
+    };
+  }
+
+  if (/\b(girl|girls|female|women|daughter)\b/i.test(q)) {
+    const girlSchemes = allSchemes.filter(s => s.gender === 'Female');
+    const list = girlSchemes.slice(0, 3).map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+    return {
+      reply: `### 👩‍🎓 Special Schemes for Girls & Women:\n\n${list}\n\n👉 *Including AICTE Pragati Scholarship for technical degrees and Sukanya Samriddhi Yojana.*`,
+      voiceText: "We have dedicated schemes for girl students, such as the AICTE Pragati Scholarship and Begum Hazrat Mahal National Scholarship.",
+      action: null,
+      chips: ["Pragati Scholarship details", "Scroll to Matcher 🎯", "Required documents 📄"]
+    };
+  }
+
+  if (/\b(disability|disabled|divyang|pwd|handicap)\b/i.test(q)) {
+    const pwdSchemes = allSchemes.filter(s => s.disability === 'true' || s.disability === 'either');
+    const list = pwdSchemes.slice(0, 3).map(s => `• **${s.name}**: ${s.benefit}`).join('\n');
+    return {
+      reply: `### ♿ Schemes for Specially-Abled Students (Divyangjan):\n\n${list}\n\n👉 *Benchmark 40%+ disability certificate with UDID card is required.*`,
+      voiceText: "Found dedicated welfare and scholarship schemes for specially-abled students, including AICTE Saksham Scholarship.",
+      action: null,
+      chips: ["Scroll to Matcher 🎯", "Open Document Vault 🔒", "How to apply?"]
+    };
+  }
+
+  // 6. SPECIFIC SCHEME NAME SEARCH
+  const matchedScheme = allSchemes.find(s => {
+    const name = s.name.toLowerCase();
+    const words = q.replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
+    return words.some(w => name.includes(w));
+  });
+
+  if (matchedScheme) {
+    const docList = Array.isArray(matchedScheme.documents) ? matchedScheme.documents.join(', ') : 'Standard KYC & academic proofs';
+    const stepsList = Array.isArray(matchedScheme.steps) ? matchedScheme.steps.map((st, i) => `${i+1}. ${st}`).join('\n') : '';
+    return {
+      reply: `### 📌 **${matchedScheme.name}**\n\n- **Ministry / Authority**: ${matchedScheme.ministry}\n- **Benefit**: ${matchedScheme.benefit || 'Financial Support'}\n- **Annual Income Ceiling**: ${matchedScheme.incomeMax ? '₹' + matchedScheme.incomeMax.toLocaleString('en-IN') : 'No upper limit'}\n- **Deadline**: ${matchedScheme.deadline || 'Rolling'}\n- **Required Documents**: ${docList}\n\n**Application Steps:**\n${stepsList}\n\n🔗 [Official Portal Link](${matchedScheme.applyUrl})`,
+      voiceText: `${matchedScheme.name} is offered by the ${matchedScheme.ministry}. It provides ${matchedScheme.benefit}. You can apply through the official portal.`,
+      action: null,
+      chips: ["Open Application Tracker 📋", "Save documents in Vault 🔒", "Find more schemes 🎓"]
+    };
+  }
+
+  // 7. DEFAULT INTELLIGENT ADVICE
+  return {
+    reply: `I can help you navigate Indian government scholarships and welfare schemes!\n\nHere are some things you can ask:\n- 🎯 *"What scholarships are available for college students?"*\n- 📋 *"What documents are needed for NSP?"*\n- 🧭 *"Start guided tour of this portal"*\n- ⚡ *"Open Services menu"* or *"Open Document Vault"*`,
+    voiceText: "I am here to guide you with Indian scholarships and website features. You can ask for scholarships by category, check required documents, or say 'Start guided tour'.",
+    action: null,
+    chips: ["Start guided tour 🧭", "Find scholarships for me 🎓", "What documents for NSP? 📄", "Open Services menu ⚡"]
+  };
+}
+
+// ---------------------------------------------------------------------------
+// SERVER ROUTER
+// ---------------------------------------------------------------------------
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const pathname = url.pathname;
   const method = req.method;
 
-  if (method === 'OPTIONS') { return sendJSON(res, 204, {}); }
+  if (method === 'OPTIONS') return sendJSON(res, 204, {});
 
   if (!pathname.startsWith('/api/')) {
     return serveStatic(req, res, pathname);
   }
 
   try {
-    // ---- public reference data ----
+    let m;
+
+    // -------------------------------------------------------------------------
+    // PUBLIC CONFIG & REFERENCE DATA
+    // -------------------------------------------------------------------------
+    if (pathname === '/api/config' && method === 'GET') {
+      return sendJSON(res, 200, {
+        googleClientId: GOOGLE_CLIENT_ID,
+        hasGoogleAuth: !!GOOGLE_CLIENT_ID,
+        nodeVersion: process.version,
+      });
+    }
+
     if (pathname === '/api/domains' && method === 'GET') return sendJSON(res, 200, DOMAINS);
     if (pathname === '/api/states' && method === 'GET') return sendJSON(res, 200, STATES);
 
@@ -356,7 +907,17 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // ---- schemes: list / detail ----
+    // AI Assistant & Voice Guidance Endpoint
+    if (pathname === '/api/ai-chat' && method === 'POST') {
+      const b = await readBody(req);
+      const query = (b.message || '').trim();
+      const reply = generateAIResponse(query);
+      return sendJSON(res, 200, reply);
+    }
+
+    // -------------------------------------------------------------------------
+    // SCHEMES: LIST / DETAIL
+    // -------------------------------------------------------------------------
     if (pathname === '/api/schemes' && method === 'GET') {
       const isAdmin = !!requireAdmin(req);
       let data = getAllSchemeRows();
@@ -366,71 +927,670 @@ const server = http.createServer(async (req, res) => {
       const domain = url.searchParams.get('domain');
       const q = (url.searchParams.get('q') || '').toLowerCase();
       if (domain) data = data.filter(s => s.domain === domain);
-      if (q) data = data.filter(s =>
-        s.name.toLowerCase().includes(q) ||
-        (s.shortDesc || '').toLowerCase().includes(q) ||
-        (s.ministry || '').toLowerCase().includes(q)
-      );
+      if (q) {
+        data = data.filter(s =>
+          s.name.toLowerCase().includes(q) ||
+          (s.shortDesc || '').toLowerCase().includes(q) ||
+          (s.ministry || '').toLowerCase().includes(q)
+        );
+      }
       return sendJSON(res, 200, data);
     }
 
-    let m;
     if ((m = pathname.match(/^\/api\/schemes\/([^/]+)$/)) && method === 'GET') {
       const s = getSchemeById(m[1]);
       if (!s) return sendJSON(res, 404, { error: 'Scheme not found' });
       return sendJSON(res, 200, s);
     }
 
-    // ---- matching engine ----
+    // -------------------------------------------------------------------------
+    // MATCHING ENGINE
+    // -------------------------------------------------------------------------
     if (pathname === '/api/match' && method === 'POST') {
       const body = await readBody(req);
       const answers = body.answers || {};
       const all = getAllSchemeRows().filter(s => s.active);
+
       const results = all.map(s => {
-        const r = computeMatch(s, answers);
-        return r ? Object.assign({}, s, { score: r.score, reasons: r.reasons }) : null;
-      }).filter(Boolean);
-      results.sort((a, b) => b.score - a.score);
-      return sendJSON(res, 200, { count: results.length, results });
+        const match = computeMatch(s, answers);
+        return Object.assign({}, s, {
+          score: match.score,
+          isFullyEligible: match.isFullyEligible,
+          reasons: match.reasons,
+          missing: match.missing,
+        });
+      }).filter(r => r.score >= 40); // Exclude irrelevancies below 40%
+
+      results.sort((a, b) => {
+        if (b.isFullyEligible !== a.isFullyEligible) {
+          return b.isFullyEligible ? 1 : -1;
+        }
+        return b.score - a.score;
+      });
+
+      return sendJSON(res, 200, {
+        count: results.length,
+        eligibleCount: results.filter(r => r.isFullyEligible).length,
+        results,
+      });
     }
 
-    // ---- admin auth ----
+    // -------------------------------------------------------------------------
+    // AUTHENTICATION: GOOGLE & LOCAL DEV
+    // -------------------------------------------------------------------------
+    if (pathname === '/api/auth/google' && method === 'POST') {
+      const body = await readBody(req);
+      const idToken = body.credential || body.idToken;
+      if (!idToken) return sendJSON(res, 400, { error: 'Missing credential / ID token' });
+
+      let payload;
+      try {
+        payload = await verifyGoogleIdTokenOnline(idToken);
+      } catch (err) {
+        return sendJSON(res, 401, { error: `Google verification failed: ${err.message}` });
+      }
+
+      const googleId = payload.sub;
+      const email = payload.email;
+      const name = payload.name || email.split('@')[0];
+      const picture = payload.picture || '';
+
+      const now = new Date().toISOString();
+      let user = db.prepare('SELECT * FROM users WHERE google_id = ? OR email = ?').get(googleId, email);
+
+      if (!user) {
+        const userId = 'U' + crypto.randomBytes(6).toString('hex');
+        db.prepare(`
+          INSERT INTO users (id, google_id, email, name, picture, role, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 'student', ?, ?)
+        `).run(userId, googleId, email, name, picture, now, now);
+
+        db.prepare(`
+          INSERT INTO user_profiles (user_id, state, age, gender, category, income, disability, occupation, education, domain, updated_at)
+          VALUES (?, '', NULL, 'Any', 'All', NULL, 'no', 'Any', 'Any', '', ?)
+        `).run(userId, now);
+
+        createNotification(userId, 'Welcome to Scheme Matcher!', 'Your account has been created. Fill your profile to save time on scholarships.', 'welcome');
+        user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+      } else {
+        db.prepare('UPDATE users SET name = ?, picture = ?, updated_at = ? WHERE id = ?').run(name, picture, now, user.id);
+      }
+
+      // Migrate anonymous device bookmarks
+      const deviceId = req.headers['x-device-id'];
+      if (deviceId) {
+        const deviceBookmarks = db.prepare('SELECT scheme_id FROM bookmarks WHERE device_id = ?').all(deviceId);
+        for (const b of deviceBookmarks) {
+          db.prepare('INSERT OR IGNORE INTO user_bookmarks (user_id, scheme_id, created_at) VALUES (?, ?, ?)')
+            .run(user.id, b.scheme_id, now);
+        }
+      }
+
+      const token = signToken({
+        sub: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        exp: Date.now() + 1000 * 60 * 60 * 24 * 7, // 7 days
+      });
+
+      return sendJSON(res, 200, {
+        token,
+        user: { id: user.id, email: user.email, name: user.name, picture: user.picture, role: user.role },
+      });
+    }
+
+    // Localhost Development / Testing Login
+    if (pathname === '/api/auth/dev-login' && method === 'POST') {
+      const body = await readBody(req);
+      const email = (body.email || 'student@localhost.test').toLowerCase().trim();
+      const name = body.name || 'Student Explorer';
+      const now = new Date().toISOString();
+
+      let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+      if (!user) {
+        const userId = 'U' + crypto.randomBytes(6).toString('hex');
+        db.prepare(`
+          INSERT INTO users (id, google_id, email, name, picture, role, created_at, updated_at)
+          VALUES (?, NULL, ?, ?, '', 'student', ?, ?)
+        `).run(userId, email, name, now, now);
+
+        db.prepare(`
+          INSERT INTO user_profiles (user_id, state, age, gender, category, income, disability, occupation, education, domain, updated_at)
+          VALUES (?, '', NULL, 'Any', 'All', NULL, 'no', 'Any', 'Any', '', ?)
+        `).run(userId, now);
+
+        createNotification(userId, 'Welcome to Scheme Matcher!', 'Local student test profile ready. Explore scholarships and manage applications.', 'welcome');
+        user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+      }
+
+      // Migrate device bookmarks
+      const deviceId = req.headers['x-device-id'];
+      if (deviceId) {
+        const deviceBookmarks = db.prepare('SELECT scheme_id FROM bookmarks WHERE device_id = ?').all(deviceId);
+        for (const b of deviceBookmarks) {
+          db.prepare('INSERT OR IGNORE INTO user_bookmarks (user_id, scheme_id, created_at) VALUES (?, ?, ?)')
+            .run(user.id, b.scheme_id, now);
+        }
+      }
+
+      const token = signToken({
+        sub: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        exp: Date.now() + 1000 * 60 * 60 * 24 * 7,
+      });
+
+      return sendJSON(res, 200, {
+        token,
+        user: { id: user.id, email: user.email, name: user.name, picture: user.picture, role: user.role },
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // CURRENT USER & PROFILE
+    // -------------------------------------------------------------------------
+    if (pathname === '/api/me' && method === 'GET') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const user = db.prepare('SELECT id, email, name, picture, role, created_at FROM users WHERE id = ?').get(auth.sub);
+      if (!user) return sendJSON(res, 404, { error: 'User not found' });
+
+      const profile = db.prepare('SELECT * FROM user_profiles WHERE user_id = ?').get(auth.sub) || {};
+      const unreadRow = db.prepare('SELECT COUNT(*) as cnt FROM notifications WHERE user_id = ? AND is_read = 0').get(auth.sub);
+
+      return sendJSON(res, 200, {
+        user,
+        profile,
+        unreadNotifications: unreadRow ? unreadRow.cnt : 0,
+      });
+    }
+
+    if (pathname === '/api/profile' && method === 'GET') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      let profile = db.prepare('SELECT * FROM user_profiles WHERE user_id = ?').get(auth.sub);
+      if (!profile) {
+        const now = new Date().toISOString();
+        db.prepare('INSERT INTO user_profiles (user_id, updated_at) VALUES (?, ?)').run(auth.sub, now);
+        profile = db.prepare('SELECT * FROM user_profiles WHERE user_id = ?').get(auth.sub);
+      }
+      return sendJSON(res, 200, profile);
+    }
+
+    if (pathname === '/api/profile' && (method === 'PUT' || method === 'POST')) {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const b = await readBody(req);
+      const now = new Date().toISOString();
+
+      db.prepare(`
+        INSERT INTO user_profiles (user_id, state, age, gender, category, income, disability, occupation, education, domain, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+          state = excluded.state,
+          age = excluded.age,
+          gender = excluded.gender,
+          category = excluded.category,
+          income = excluded.income,
+          disability = excluded.disability,
+          occupation = excluded.occupation,
+          education = excluded.education,
+          domain = excluded.domain,
+          updated_at = excluded.updated_at
+      `).run(
+        auth.sub,
+        b.state || '',
+        b.age ? parseInt(b.age, 10) : null,
+        b.gender || 'Any',
+        b.category || 'All',
+        b.income !== undefined && b.income !== '' ? parseInt(b.income, 10) : null,
+        b.disability || 'no',
+        b.occupation || 'Any',
+        b.education || 'Any',
+        b.domain || '',
+        now
+      );
+
+      return sendJSON(res, 200, db.prepare('SELECT * FROM user_profiles WHERE user_id = ?').get(auth.sub));
+    }
+
+    // -------------------------------------------------------------------------
+    // BOOKMARKS (Anonymous device or Authenticated student)
+    // -------------------------------------------------------------------------
+    if (pathname === '/api/bookmarks' && method === 'GET') {
+      const auth = requireUser(req);
+      if (auth) {
+        const rows = db.prepare('SELECT scheme_id FROM user_bookmarks WHERE user_id = ?').all(auth.sub);
+        return sendJSON(res, 200, rows.map(r => r.scheme_id));
+      } else {
+        const deviceId = req.headers['x-device-id'];
+        if (!deviceId) return sendJSON(res, 400, { error: 'Missing X-Device-Id header or Authorization token' });
+        const rows = db.prepare('SELECT scheme_id FROM bookmarks WHERE device_id = ?').all(deviceId);
+        return sendJSON(res, 200, rows.map(r => r.scheme_id));
+      }
+    }
+
+    if ((m = pathname.match(/^\/api\/bookmarks\/([^/]+)$/)) && method === 'POST') {
+      const schemeId = m[1];
+      const auth = requireUser(req);
+      const now = new Date().toISOString();
+
+      if (auth) {
+        const existing = db.prepare('SELECT 1 FROM user_bookmarks WHERE user_id = ? AND scheme_id = ?').get(auth.sub, schemeId);
+        if (existing) {
+          db.prepare('DELETE FROM user_bookmarks WHERE user_id = ? AND scheme_id = ?').run(auth.sub, schemeId);
+          return sendJSON(res, 200, { bookmarked: false });
+        } else {
+          db.prepare('INSERT INTO user_bookmarks (user_id, scheme_id, created_at) VALUES (?, ?, ?)').run(auth.sub, schemeId, now);
+          return sendJSON(res, 200, { bookmarked: true });
+        }
+      } else {
+        const deviceId = req.headers['x-device-id'];
+        if (!deviceId) return sendJSON(res, 400, { error: 'Missing X-Device-Id header' });
+        const existing = db.prepare('SELECT 1 FROM bookmarks WHERE device_id = ? AND scheme_id = ?').get(deviceId, schemeId);
+        if (existing) {
+          db.prepare('DELETE FROM bookmarks WHERE device_id = ? AND scheme_id = ?').run(deviceId, schemeId);
+          return sendJSON(res, 200, { bookmarked: false });
+        } else {
+          db.prepare('INSERT INTO bookmarks (device_id, scheme_id, created_at) VALUES (?, ?, ?)').run(deviceId, schemeId, now);
+          return sendJSON(res, 200, { bookmarked: true });
+        }
+      }
+    }
+
+    // Explicit bookmark migration
+    if (pathname === '/api/bookmarks/migrate' && method === 'POST') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+      const deviceId = req.headers['x-device-id'];
+      if (!deviceId) return sendJSON(res, 400, { error: 'Missing X-Device-Id header' });
+
+      const deviceBookmarks = db.prepare('SELECT scheme_id FROM bookmarks WHERE device_id = ?').all(deviceId);
+      const now = new Date().toISOString();
+      let count = 0;
+      for (const b of deviceBookmarks) {
+        const resRun = db.prepare('INSERT OR IGNORE INTO user_bookmarks (user_id, scheme_id, created_at) VALUES (?, ?, ?)').run(auth.sub, b.scheme_id, now);
+        if (resRun.changes > 0) count++;
+      }
+      return sendJSON(res, 200, { migrated: count });
+    }
+
+    // -------------------------------------------------------------------------
+    // APPLICATION TRACKER
+    // -------------------------------------------------------------------------
+    if (pathname === '/api/applications' && method === 'GET') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const rows = db.prepare(`
+        SELECT a.*, s.name as scheme_name, s.ministry as scheme_ministry, s.benefit as scheme_benefit, s.apply_url as scheme_apply_url
+        FROM applications a
+        LEFT JOIN schemes s ON a.scheme_id = s.id
+        WHERE a.user_id = ?
+        ORDER BY a.updated_at DESC
+      `).all(auth.sub);
+
+      return sendJSON(res, 200, rows);
+    }
+
+    if (pathname === '/api/applications' && method === 'POST') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const b = await readBody(req);
+      if (!b.scheme_id) return sendJSON(res, 400, { error: 'scheme_id is required' });
+
+      const scheme = getSchemeById(b.scheme_id);
+      if (!scheme) return sendJSON(res, 404, { error: 'Scheme does not exist' });
+
+      const id = 'APP' + crypto.randomBytes(6).toString('hex').toUpperCase();
+      const now = new Date().toISOString();
+      const status = b.status || 'Preparing';
+      const appliedAt = b.applied_at || (status === 'Applied' ? now : null);
+
+      db.prepare(`
+        INSERT INTO applications (id, user_id, scheme_id, status, applied_at, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, auth.sub, b.scheme_id, status, appliedAt, b.notes || '', now, now);
+
+      createNotification(auth.sub, 'Application Created', `Tracking application for "${scheme.name}" (Status: ${status}).`, 'application');
+
+      const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(id);
+      return sendJSON(res, 201, app);
+    }
+
+    if ((m = pathname.match(/^\/api\/applications\/([^/]+)$/)) && (method === 'PUT' || method === 'PATCH')) {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const existing = db.prepare('SELECT * FROM applications WHERE id = ? AND user_id = ?').get(m[1], auth.sub);
+      if (!existing) return sendJSON(res, 404, { error: 'Application not found' });
+
+      const b = await readBody(req);
+      const now = new Date().toISOString();
+      const status = b.status || existing.status;
+      const notes = b.notes !== undefined ? b.notes : existing.notes;
+      const appliedAt = b.applied_at !== undefined ? b.applied_at : existing.applied_at;
+
+      db.prepare(`
+        UPDATE applications SET status = ?, notes = ?, applied_at = ?, updated_at = ? WHERE id = ?
+      `).run(status, notes, appliedAt, now, m[1]);
+
+      if (status !== existing.status) {
+        const scheme = getSchemeById(existing.scheme_id);
+        const schemeName = scheme ? scheme.name : 'Scholarship';
+        createNotification(auth.sub, 'Status Updated', `Application for "${schemeName}" status changed to: ${status}.`, 'application');
+      }
+
+      const updated = db.prepare('SELECT * FROM applications WHERE id = ?').get(m[1]);
+      return sendJSON(res, 200, updated);
+    }
+
+    if ((m = pathname.match(/^\/api\/applications\/([^/]+)$/)) && method === 'DELETE') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const existing = db.prepare('SELECT * FROM applications WHERE id = ? AND user_id = ?').get(m[1], auth.sub);
+      if (!existing) return sendJSON(res, 404, { error: 'Application not found' });
+
+      db.prepare('DELETE FROM applications WHERE id = ?').run(m[1]);
+      return sendJSON(res, 200, { deleted: true });
+    }
+
+    // -------------------------------------------------------------------------
+    // DOCUMENT MANAGEMENT (Real File Upload & Storage)
+    // -------------------------------------------------------------------------
+    if (pathname === '/api/documents' && method === 'GET') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const rows = db.prepare(`
+        SELECT id, doc_type, file_name, file_size, mime_type, uploaded_at
+        FROM documents WHERE user_id = ? ORDER BY uploaded_at DESC
+      `).all(auth.sub);
+
+      return sendJSON(res, 200, rows);
+    }
+
+    if (pathname === '/api/documents' && method === 'POST') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const b = await readBody(req);
+      const { docType, fileName, fileBase64, mimeType } = b;
+
+      if (!docType || !fileName || !fileBase64) {
+        return sendJSON(res, 400, { error: 'docType, fileName, and fileBase64 are required' });
+      }
+
+      // Validations
+      const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      const effectiveMime = mimeType || 'application/octet-stream';
+      if (!allowedMimes.includes(effectiveMime.toLowerCase())) {
+        return sendJSON(res, 400, { error: 'Only PDF, JPG, and PNG files are accepted.' });
+      }
+
+      const buffer = Buffer.from(fileBase64, 'base64');
+      if (buffer.length > 5 * 1024 * 1024) {
+        return sendJSON(res, 400, { error: 'File size exceeds maximum 5MB limit.' });
+      }
+
+      // Safe filename generation & path traversal prevention
+      const ext = path.extname(fileName).toLowerCase() || '.bin';
+      const safeId = 'DOC_' + crypto.randomUUID();
+      const storageName = `${safeId}${ext}`;
+      const filePath = path.join(UPLOADS_DIR, storageName);
+
+      fs.writeFileSync(filePath, buffer);
+
+      const now = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO documents (id, user_id, doc_type, file_name, file_path, file_size, mime_type, uploaded_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(safeId, auth.sub, docType, path.basename(fileName), storageName, buffer.length, effectiveMime, now);
+
+      createNotification(auth.sub, 'Document Uploaded', `Document "${docType}" successfully stored in vault.`, 'document');
+
+      return sendJSON(res, 201, {
+        id: safeId,
+        docType,
+        fileName: path.basename(fileName),
+        fileSize: buffer.length,
+        mimeType: effectiveMime,
+        uploadedAt: now,
+      });
+    }
+
+    if ((m = pathname.match(/^\/api\/documents\/([^/]+)\/download$/)) && method === 'GET') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const doc = db.prepare('SELECT * FROM documents WHERE id = ? AND user_id = ?').get(m[1], auth.sub);
+      if (!doc) return sendJSON(res, 404, { error: 'Document not found' });
+
+      const safePath = path.join(UPLOADS_DIR, path.basename(doc.file_path));
+      if (!fs.existsSync(safePath)) return sendJSON(res, 404, { error: 'Physical file not found on disk' });
+
+      const data = fs.readFileSync(safePath);
+      res.writeHead(200, {
+        'Content-Type': doc.mime_type,
+        'Content-Length': data.length,
+        'Content-Disposition': `inline; filename="${encodeURIComponent(doc.file_name)}"`,
+      });
+      return res.end(data);
+    }
+
+    if ((m = pathname.match(/^\/api\/documents\/([^/]+)$/)) && method === 'DELETE') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const doc = db.prepare('SELECT * FROM documents WHERE id = ? AND user_id = ?').get(m[1], auth.sub);
+      if (!doc) return sendJSON(res, 404, { error: 'Document not found' });
+
+      const safePath = path.join(UPLOADS_DIR, path.basename(doc.file_path));
+      if (fs.existsSync(safePath)) {
+        try { fs.unlinkSync(safePath); } catch (e) {}
+      }
+
+      db.prepare('DELETE FROM documents WHERE id = ?').run(m[1]);
+      return sendJSON(res, 200, { deleted: true });
+    }
+
+    // -------------------------------------------------------------------------
+    // NOTIFICATIONS
+    // -------------------------------------------------------------------------
+    if (pathname === '/api/notifications' && method === 'GET') {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      const rows = db.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').all(auth.sub);
+      return sendJSON(res, 200, rows);
+    }
+
+    if ((m = pathname.match(/^\/api\/notifications\/([^/]+)\/read$/)) && (method === 'PUT' || method === 'POST')) {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      db.prepare('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?').run(m[1], auth.sub);
+      return sendJSON(res, 200, { success: true });
+    }
+
+    if (pathname === '/api/notifications/read-all' && (method === 'PUT' || method === 'POST')) {
+      const auth = requireUser(req);
+      if (!auth) return sendJSON(res, 401, { error: 'Authentication required' });
+
+      db.prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ?').run(auth.sub);
+      return sendJSON(res, 200, { success: true });
+    }
+
+    // -------------------------------------------------------------------------
+    // SERVICE REQUESTS (Donations & Volunteers - Genuine Registration, No Fake Payment)
+    // -------------------------------------------------------------------------
+    if (pathname === '/api/service-requests' && method === 'POST') {
+      const auth = getAuthUser(req);
+      const b = await readBody(req);
+      const type = b.type; // 'donation' or 'volunteer'
+
+      if (!type || !['donation', 'volunteer', 'support'].includes(type)) {
+        return sendJSON(res, 400, { error: 'Invalid service request type' });
+      }
+
+      const id = 'SR_' + crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      if (type === 'donation') {
+        if (!b.amount || parseFloat(b.amount) <= 0) {
+          return sendJSON(res, 400, { error: 'Valid donation pledge amount is required' });
+        }
+        if (!b.name || !b.email) {
+          return sendJSON(res, 400, { error: 'Name and email are required for tax receipting' });
+        }
+      } else if (type === 'volunteer') {
+        if (!b.name || !b.email || !b.interests) {
+          return sendJSON(res, 400, { error: 'Name, email, and interests are required for volunteer signup' });
+        }
+      }
+
+      db.prepare(`
+        INSERT INTO service_requests (id, user_id, type, data, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(
+        id,
+        auth ? auth.sub : null,
+        type,
+        JSON.stringify(b),
+        type === 'donation' ? 'pledged' : 'registered',
+        now
+      );
+
+      logAudit(`New ${type} request submitted by ${b.name || 'Anonymous'}`);
+
+      return sendJSON(res, 201, {
+        id,
+        type,
+        status: type === 'donation' ? 'pledged' : 'registered',
+        message: type === 'donation'
+          ? 'Thank you for your generous pledge! Our verification coordinator will contact you with official payment channels (UPI/NEFT) and 80G tax exemption details.'
+          : 'Thank you for volunteering! Our community manager will review your submission and connect with you shortly.',
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // FEEDBACK
+    // -------------------------------------------------------------------------
+    if (pathname === '/api/feedback' && method === 'POST') {
+      const auth = getAuthUser(req);
+      const b = await readBody(req);
+      const rating = parseInt(b.rating, 10);
+
+      if (!rating || rating < 1 || rating > 5) {
+        return sendJSON(res, 400, { error: 'Rating between 1 and 5 is required' });
+      }
+      if (!b.message || !b.message.trim()) {
+        return sendJSON(res, 400, { error: 'Feedback message is required' });
+      }
+
+      const id = 'FB_' + crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      db.prepare('INSERT INTO feedback (id, user_id, rating, message, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run(id, auth ? auth.sub : null, rating, b.message.trim(), now);
+
+      return sendJSON(res, 201, { success: true, message: 'Thank you for your feedback!' });
+    }
+
+    // -------------------------------------------------------------------------
+    // ADMIN PORTAL & MANAGEMENT
+    // -------------------------------------------------------------------------
     if (pathname === '/api/admin/login' && method === 'POST') {
       const body = await readBody(req);
       const user = db.prepare('SELECT * FROM admin_users WHERE username = ?').get('admin');
       if (!user) return sendJSON(res, 500, { error: 'No admin user configured' });
+
       const hash = hashPassword(body.password || '', user.salt);
       const ok = crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(user.hash));
       if (!ok) return sendJSON(res, 401, { error: 'Incorrect password' });
-      const token = signToken({ role: 'admin', sub: 'admin', exp: Date.now() + 1000 * 60 * 60 * 8 });
+
+      const token = signToken({ role: 'admin', sub: 'admin', exp: Date.now() + 1000 * 60 * 60 * 12 });
       logAudit('Admin signed in');
       return sendJSON(res, 200, { token });
     }
 
-    // ---- admin: audit log ----
     if (pathname === '/api/admin/audit-log' && method === 'GET') {
       if (!requireAdmin(req)) return sendJSON(res, 401, { error: 'Unauthorized' });
-      const rows = db.prepare('SELECT * FROM audit_log ORDER BY id DESC LIMIT 100').all();
+      const rows = db.prepare('SELECT * FROM audit_log ORDER BY id DESC LIMIT 150').all();
       return sendJSON(res, 200, rows);
     }
 
-    // ---- admin: scheme CRUD ----
+    if (pathname === '/api/admin/users' && method === 'GET') {
+      if (!requireAdmin(req)) return sendJSON(res, 401, { error: 'Unauthorized' });
+      const rows = db.prepare(`
+        SELECT u.id, u.email, u.name, u.role, u.created_at,
+               p.state, p.category, p.education,
+               (SELECT COUNT(*) FROM applications WHERE user_id = u.id) as app_count,
+               (SELECT COUNT(*) FROM documents WHERE user_id = u.id) as doc_count
+        FROM users u
+        LEFT JOIN user_profiles p ON u.id = p.user_id
+        ORDER BY u.created_at DESC
+      `).all();
+      return sendJSON(res, 200, rows);
+    }
+
+    if (pathname === '/api/admin/applications' && method === 'GET') {
+      if (!requireAdmin(req)) return sendJSON(res, 401, { error: 'Unauthorized' });
+      const rows = db.prepare(`
+        SELECT a.*, u.name as user_name, u.email as user_email, s.name as scheme_name
+        FROM applications a
+        LEFT JOIN users u ON a.user_id = u.id
+        LEFT JOIN schemes s ON a.scheme_id = s.id
+        ORDER BY a.updated_at DESC
+      `).all();
+      return sendJSON(res, 200, rows);
+    }
+
+    if (pathname === '/api/admin/service-requests' && method === 'GET') {
+      if (!requireAdmin(req)) return sendJSON(res, 401, { error: 'Unauthorized' });
+      const rows = db.prepare('SELECT * FROM service_requests ORDER BY created_at DESC').all();
+      return sendJSON(res, 200, rows);
+    }
+
+    if (pathname === '/api/admin/feedback' && method === 'GET') {
+      if (!requireAdmin(req)) return sendJSON(res, 401, { error: 'Unauthorized' });
+      const rows = db.prepare(`
+        SELECT f.*, u.name as user_name, u.email as user_email
+        FROM feedback f
+        LEFT JOIN users u ON f.user_id = u.id
+        ORDER BY f.created_at DESC
+      `).all();
+      return sendJSON(res, 200, rows);
+    }
+
+    // Scheme Mutations (Admin only)
     if (pathname === '/api/schemes' && method === 'POST') {
       const admin = requireAdmin(req);
       if (!admin) return sendJSON(res, 401, { error: 'Unauthorized' });
+
       const b = await readBody(req);
       if (!b.name) return sendJSON(res, 400, { error: 'Scheme name is required' });
+
       const id = 'S' + crypto.randomBytes(4).toString('hex').toUpperCase();
       const now = new Date().toISOString();
+
       insertStmt.run(
         id, b.name, b.shortDesc || '', b.ministry || 'Not specified', b.level || 'Central', b.domain || 'education',
         JSON.stringify(b.states || 'All'), JSON.stringify(b.category || 'All'), b.gender || 'Any',
         b.minAge ?? null, b.maxAge ?? null, b.incomeMax ?? null,
         JSON.stringify(b.education || 'Any'), JSON.stringify(b.occupation || 'Any'), b.disability || 'either',
         b.benefitType || '', b.benefit || '', JSON.stringify(b.documents || []), JSON.stringify(b.steps || []),
-        b.applyUrl || 'https://www.myscheme.gov.in', b.sourceUrl || 'admin-added', b.lastVerified || now.slice(0,10),
+        b.applyUrl || 'https://www.myscheme.gov.in', b.sourceUrl || 'admin-added', b.lastVerified || now.slice(0, 10),
         b.deadline || 'Rolling', 1, now, now
       );
+
       logAudit(`Added scheme "${b.name}" (${id})`);
       return sendJSON(res, 201, getSchemeById(id));
     }
@@ -438,14 +1598,19 @@ const server = http.createServer(async (req, res) => {
     if ((m = pathname.match(/^\/api\/schemes\/([^/]+)$/)) && (method === 'PUT' || method === 'PATCH')) {
       const admin = requireAdmin(req);
       if (!admin) return sendJSON(res, 401, { error: 'Unauthorized' });
+
       const existing = getSchemeById(m[1]);
       if (!existing) return sendJSON(res, 404, { error: 'Scheme not found' });
+
       const b = await readBody(req);
       const merged = Object.assign({}, existing, b);
       const now = new Date().toISOString();
-      db.prepare(`UPDATE schemes SET name=?, short_desc=?, ministry=?, level=?, domain=?, states=?, category=?, gender=?,
+
+      db.prepare(`
+        UPDATE schemes SET name=?, short_desc=?, ministry=?, level=?, domain=?, states=?, category=?, gender=?,
         min_age=?, max_age=?, income_max=?, education=?, occupation=?, disability=?, benefit_type=?, benefit=?,
-        documents=?, steps=?, apply_url=?, source_url=?, last_verified=?, deadline=?, active=?, updated_at=? WHERE id=?`).run(
+        documents=?, steps=?, apply_url=?, source_url=?, last_verified=?, deadline=?, active=?, updated_at=? WHERE id=?
+      `).run(
         merged.name, merged.shortDesc, merged.ministry, merged.level, merged.domain,
         JSON.stringify(merged.states), JSON.stringify(merged.category), merged.gender,
         merged.minAge, merged.maxAge, merged.incomeMax,
@@ -454,6 +1619,7 @@ const server = http.createServer(async (req, res) => {
         merged.applyUrl, merged.sourceUrl, merged.lastVerified, merged.deadline,
         merged.active ? 1 : 0, now, m[1]
       );
+
       logAudit(`Updated scheme "${merged.name}" (${m[1]})`);
       return sendJSON(res, 200, getSchemeById(m[1]));
     }
@@ -461,8 +1627,10 @@ const server = http.createServer(async (req, res) => {
     if ((m = pathname.match(/^\/api\/schemes\/([^/]+)\/toggle$/)) && method === 'PATCH') {
       const admin = requireAdmin(req);
       if (!admin) return sendJSON(res, 401, { error: 'Unauthorized' });
+
       const existing = getSchemeById(m[1]);
       if (!existing) return sendJSON(res, 404, { error: 'Scheme not found' });
+
       const newActive = existing.active ? 0 : 1;
       db.prepare('UPDATE schemes SET active=?, updated_at=? WHERE id=?').run(newActive, new Date().toISOString(), m[1]);
       logAudit(`${newActive ? 'Reactivated' : 'Deactivated'} "${existing.name}" (${m[1]})`);
@@ -472,8 +1640,10 @@ const server = http.createServer(async (req, res) => {
     if ((m = pathname.match(/^\/api\/schemes\/([^/]+)$/)) && method === 'DELETE') {
       const admin = requireAdmin(req);
       if (!admin) return sendJSON(res, 401, { error: 'Unauthorized' });
+
       const existing = getSchemeById(m[1]);
       if (!existing) return sendJSON(res, 404, { error: 'Scheme not found' });
+
       db.prepare('DELETE FROM schemes WHERE id=?').run(m[1]);
       logAudit(`Deleted scheme "${existing.name}" (${m[1]})`);
       return sendJSON(res, 200, { deleted: true });
@@ -482,9 +1652,11 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/schemes/bulk' && method === 'POST') {
       const admin = requireAdmin(req);
       if (!admin) return sendJSON(res, 401, { error: 'Unauthorized' });
+
       const b = await readBody(req);
       const arr = Array.isArray(b) ? b : b.schemes;
       if (!Array.isArray(arr)) return sendJSON(res, 400, { error: 'Body must be a JSON array of schemes' });
+
       let count = 0;
       const now = new Date().toISOString();
       for (const item of arr) {
@@ -496,7 +1668,7 @@ const server = http.createServer(async (req, res) => {
           item.minAge ?? null, item.maxAge ?? null, item.incomeMax ?? null,
           JSON.stringify(item.education || 'Any'), JSON.stringify(item.occupation || 'Any'), item.disability || 'either',
           item.benefitType || '', item.benefit || '', JSON.stringify(item.documents || []), JSON.stringify(item.steps || []),
-          item.applyUrl || 'https://www.myscheme.gov.in', item.sourceUrl || 'bulk-import', item.lastVerified || now.slice(0,10),
+          item.applyUrl || 'https://www.myscheme.gov.in', item.sourceUrl || 'bulk-import', item.lastVerified || now.slice(0, 10),
           item.deadline || 'Rolling', 1, now, now
         );
         count++;
@@ -505,38 +1677,28 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 201, { imported: count });
     }
 
-    // ---- bookmarks (device-scoped, no login required) ----
-    if (pathname === '/api/bookmarks' && method === 'GET') {
-      const deviceId = req.headers['x-device-id'];
-      if (!deviceId) return sendJSON(res, 400, { error: 'Missing X-Device-Id header' });
-      const rows = db.prepare('SELECT scheme_id FROM bookmarks WHERE device_id = ?').all(deviceId);
-      return sendJSON(res, 200, rows.map(r => r.scheme_id));
-    }
-    if ((m = pathname.match(/^\/api\/bookmarks\/([^/]+)$/)) && method === 'POST') {
-      const deviceId = req.headers['x-device-id'];
-      if (!deviceId) return sendJSON(res, 400, { error: 'Missing X-Device-Id header' });
-      const schemeId = m[1];
-      const existing = db.prepare('SELECT 1 FROM bookmarks WHERE device_id=? AND scheme_id=?').get(deviceId, schemeId);
-      if (existing) {
-        db.prepare('DELETE FROM bookmarks WHERE device_id=? AND scheme_id=?').run(deviceId, schemeId);
-        return sendJSON(res, 200, { bookmarked: false });
-      } else {
-        db.prepare('INSERT INTO bookmarks (device_id, scheme_id, created_at) VALUES (?,?,?)').run(deviceId, schemeId, new Date().toISOString());
-        return sendJSON(res, 200, { bookmarked: true });
-      }
-    }
-
-    return sendJSON(res, 404, { error: 'Not found' });
+    return sendJSON(res, 404, { error: 'Endpoint not found' });
   } catch (err) {
-    console.error(err);
+    console.error('[SERVER ERROR]', err);
     return sendJSON(res, 500, { error: err.message || 'Internal server error' });
   }
 });
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`Scheme Matcher backend running → http://localhost:${PORT}`);
+    console.log(`[READY] Scheme Matcher running at http://localhost:${PORT}`);
+    if (!GOOGLE_CLIENT_ID) {
+      console.log(`[INFO] Google Client ID not set in environment. Google sign-in fallback and local test sign-in available.`);
+    }
   });
 }
 
-module.exports = { server, db, computeMatch, getAllSchemeRows, getSchemeById };
+module.exports = {
+  server,
+  db,
+  computeMatch,
+  getAllSchemeRows,
+  getSchemeById,
+  signToken,
+  verifyToken,
+};
