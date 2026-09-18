@@ -5,8 +5,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scheme Matcher — India Welfare Matcher</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+
+  <!-- ========= LOGIN GATE OVERLAY ========= -->
+  <div id="login-gate" class="login-gate">
+    <div class="login-gate-bg"></div>
+    <div class="login-gate-card">
+      <div class="login-gate-logo">
+        <div class="gate-flag">
+          <span class="gf-saffron"></span>
+          <span class="gf-white"></span>
+          <span class="gf-green"></span>
+        </div>
+        <h1>Scheme Matcher</h1>
+        <p>Government Scheme &amp; Scholarship Finder for India</p>
+      </div>
+
+      <div class="login-gate-body">
+        <h2>Welcome! Please sign in to continue</h2>
+        <p class="login-gate-subtitle">Discover government schemes and scholarships you're eligible for — free, personalised, and in seconds.</p>
+
+        <!-- Google Sign-In -->
+        <div id="gate-google-btn-slot" class="google-auth-slot">
+          <button type="button" id="gate-google-fake-btn" class="google-signin-btn">
+            <svg class="google-icon" width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.79l7.97-6.2z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              <path fill="none" d="M0 0h48v48H0z"/>
+            </svg>
+            <span>Sign in with Google</span>
+          </button>
+        </div>
+        <div id="gate-google-note" class="hidden" style="display:none !important;"></div>
+
+        <div class="divider-text"><span>OR CONTINUE WITH EMAIL</span></div>
+
+        <form id="gate-login-form">
+          <div class="form-group">
+            <label for="gate-email">Email Address</label>
+            <input type="email" id="gate-email" placeholder="yourname@example.com" required autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label for="gate-name">Full Name</label>
+            <input type="text" id="gate-name" placeholder="Your Full Name" required autocomplete="name">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="gate-login-btn">Continue to Scheme Matcher →</button>
+          <div id="gate-login-error" class="error-text hidden"></div>
+        </form>
+      </div>
+
+      <div class="login-gate-footer">
+        <p>🔒 Your data is stored only on this device. No spam, no tracking.</p>
+      </div>
+    </div>
+  </div>
+  <!-- HEADER -->
   <header class="header">
     <div class="container header-container">
       <div class="logo-area">
@@ -18,15 +76,88 @@
           <p>Government Scheme & Scholarship Matcher for India</p>
         </div>
       </div>
-      <nav class="nav">
-        <button class="nav-btn active" data-tab="match-tab">Find Schemes</button>
-        <button class="nav-btn" data-tab="browse-tab">Browse All</button>
-        <button class="nav-btn" data-tab="bookmarks-tab">Bookmarks (<span id="bookmark-count">0</span>)</button>
-        <button class="nav-btn" data-tab="admin-tab">Admin Portal</button>
+
+      <nav class="nav" aria-label="Main Navigation">
+        <button class="nav-btn active" data-tab="match-tab" id="nav-match">Find Schemes</button>
+        <button class="nav-btn" data-tab="browse-tab" id="nav-browse">Browse All</button>
+        <button class="nav-btn" data-tab="bookmarks-tab" id="nav-bookmarks">Bookmarks (<span id="bookmark-count">0</span>)</button>
+        
+        <!-- SERVICES FANCY POP-OUT PANEL -->
+        <div class="services-dropdown" id="services-dropdown-container">
+          <button class="nav-btn services-btn" id="btn-services-menu" aria-haspopup="true" aria-expanded="false">
+            ⚡ Services <span class="svc-chevron">▾</span>
+          </button>
+          <div class="services-menu hidden" id="services-menu" role="menu">
+            <div class="svc-menu-header">
+              <span class="svc-menu-title">Quick Access</span>
+              <span class="svc-menu-tagline">Your tools, all in one place</span>
+            </div>
+            <div class="svc-grid">
+              <button class="svc-card" id="svc-match" role="menuitem">
+                <span class="svc-card-icon">🎓</span>
+                <span class="svc-card-label">Scholarship<br>Matcher</span>
+              </button>
+              <button class="svc-card" id="svc-tracker" role="menuitem">
+                <span class="svc-card-icon">📝</span>
+                <span class="svc-card-label">Application<br>Tracker</span>
+              </button>
+              <button class="svc-card" id="svc-vault" role="menuitem">
+                <span class="svc-card-icon">📁</span>
+                <span class="svc-card-label">Document<br>Vault</span>
+              </button>
+              <button class="svc-card" id="svc-alerts" role="menuitem">
+                <span class="svc-card-icon">🔔</span>
+                <span class="svc-card-label">Notifications<span id="menu-notif-badge" class="notif-badge hidden">0</span></span>
+              </button>
+              <button class="svc-card" id="svc-profile" role="menuitem">
+                <span class="svc-card-icon">👤</span>
+                <span class="svc-card-label">My<br>Profile</span>
+              </button>
+              <button class="svc-card" id="svc-feedback" role="menuitem">
+                <span class="svc-card-icon">💬</span>
+                <span class="svc-card-label">Give<br>Feedback</span>
+              </button>
+            </div>
+            <div class="svc-menu-footer">
+              <button class="svc-footer-btn" id="svc-donation" role="menuitem">❤️ Support &amp; Donate</button>
+              <button class="svc-footer-btn" id="svc-volunteer" role="menuitem">🤝 Volunteer With Us</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="nav-btn" data-tab="admin-tab" id="nav-admin">Admin Portal</button>
       </nav>
+
+      <!-- USER AUTHENTICATION PILL -->
+      <div class="user-auth-area" id="user-auth-area">
+        <!-- Logged Out State -->
+        <div id="auth-logged-out" class="auth-logged-out">
+          <div id="g_id_onload"></div>
+          <div id="g_id_signin"></div>
+          <button id="btn-login-modal" class="btn btn-sm btn-outline-light" title="Sign in or try local demo">
+            👤 Student Sign In
+          </button>
+        </div>
+
+        <!-- Logged In State -->
+        <div id="auth-logged-in" class="auth-logged-in hidden">
+          <div class="user-pill" id="btn-open-profile-pill" title="Click to view profile">
+            <img id="user-avatar-img" class="user-avatar hidden" alt="User Avatar" src="">
+            <span id="user-avatar-fallback" class="user-avatar-fallback">U</span>
+            <span id="user-display-name" class="user-name">Student</span>
+          </div>
+          <button id="btn-notif-bell" class="btn-icon" title="Notifications" aria-label="Notifications">
+            🔔<span id="bell-notif-badge" class="notif-badge hidden">0</span>
+          </button>
+          <button id="btn-user-logout" class="btn btn-sm btn-outline-light" title="Sign out">
+            Sign Out
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
+  <!-- STATS BAR -->
   <div class="stats-bar">
     <div class="container stats-container">
       <span class="stat-item">🟢 Live Active Schemes: <strong id="stat-active-count">0</strong></span>
@@ -35,13 +166,22 @@
     </div>
   </div>
 
+  <!-- MAIN APPLICATION CONTENT -->
   <main class="container main-content">
-    <!-- TAB 1: MATCHING QUESTIONNAIRE -->
-    <section id="match-tab" class="tab-content active">
+    
+    <!-- TAB 1: MATCHING QUESTIONNAIRE (CORE PRODUCT) -->
+    <section id="match-tab" class="tab-content active" aria-labelledby="nav-match">
       <div class="card-grid">
         <div class="card form-card">
-          <h2>Find Schemes You Qualify For</h2>
-          <p class="subtitle">Fill out the questionnaire below. We will calculate match scores and filter schemes accordingly.</p>
+          <div class="form-header-flex">
+            <div>
+              <h2>Find Schemes You Qualify For</h2>
+              <p class="subtitle">Fill out your eligibility details below. Our deterministic matching engine calculates score percentages and reasons.</p>
+            </div>
+            <button type="button" id="btn-autofill-profile" class="btn btn-secondary btn-sm" title="Populate fields from your saved profile">
+              ⚡ Load from Profile
+            </button>
+          </div>
           
           <form id="matcher-form">
             <div class="form-row">
@@ -84,7 +224,7 @@
                 <input type="number" id="income" name="income" min="0" placeholder="e.g. 150000" required>
               </div>
               <div class="form-group">
-                <label for="disability">Specially-Abled (Disability 40%+)?</label>
+                <label>Specially-Abled (Disability 40%+)?</label>
                 <div class="radio-group">
                   <label><input type="radio" name="disability" value="yes"> Yes</label>
                   <label><input type="radio" name="disability" value="no" checked> No</label>
@@ -97,8 +237,8 @@
                 <label for="occupation">Occupation</label>
                 <select id="occupation" name="occupation" required>
                   <option value="Any">Any / Other</option>
-                  <option value="Farmer">Farmer</option>
                   <option value="Student">Student</option>
+                  <option value="Farmer">Farmer</option>
                   <option value="Unemployed">Unemployed</option>
                   <option value="Employed">Employed / Salaried</option>
                   <option value="Self-employed">Self-employed</option>
@@ -128,7 +268,9 @@
               </select>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-block">Search Matching Schemes</button>
+            <button type="submit" id="btn-search-match" class="btn btn-primary btn-block">
+              Search Matching Schemes
+            </button>
           </form>
         </div>
 
@@ -148,10 +290,10 @@
     </section>
 
     <!-- TAB 2: BROWSE ALL -->
-    <section id="browse-tab" class="tab-content">
+    <section id="browse-tab" class="tab-content" aria-labelledby="nav-browse">
       <div class="search-filters">
-        <input type="text" id="search-q" placeholder="Search schemes by name, keyword, or ministry...">
-        <select id="filter-domain">
+        <input type="text" id="search-q" placeholder="Search schemes by name, keyword, or ministry..." aria-label="Search schemes">
+        <select id="filter-domain" aria-label="Filter by domain">
           <option value="">All Domains</option>
           <!-- Populated dynamically -->
         </select>
@@ -162,10 +304,12 @@
     </section>
 
     <!-- TAB 3: BOOKMARKS -->
-    <section id="bookmarks-tab" class="tab-content">
+    <section id="bookmarks-tab" class="tab-content" aria-labelledby="nav-bookmarks">
       <div class="results-header">
-        <h2>Your Saved Schemes</h2>
-        <p>Bookmarked schemes are saved locally on this device.</p>
+        <div>
+          <h2>Your Saved Schemes</h2>
+          <p id="bookmarks-subtitle">Bookmarked schemes are saved to your account or device.</p>
+        </div>
       </div>
       <div id="bookmarks-list" class="schemes-grid">
         <div class="empty-state">
@@ -176,57 +320,550 @@
     </section>
 
     <!-- TAB 4: ADMIN PORTAL -->
-    <section id="admin-tab" class="tab-content">
+    <section id="admin-tab" class="tab-content" aria-labelledby="nav-admin">
+      <!-- Admin Login View -->
       <div id="admin-login-view" class="card admin-login-card">
         <h2>Admin Authentication</h2>
-        <p>Login to add, edit, or delete schemes, and view system logs.</p>
+        <p>Sign in to manage schemes, view registered users, track applications, and inspect system audit logs.</p>
         <form id="admin-login-form">
           <div class="form-group">
             <label for="admin-password">Admin Password</label>
-            <input type="password" id="admin-password" placeholder="Enter password (default: admin123)" required>
+            <input type="password" id="admin-password" placeholder="Enter admin password" required autocomplete="current-password">
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Login</button>
+          <button type="submit" class="btn btn-primary btn-block">Login to Admin Portal</button>
           <div id="login-error" class="error-text hidden"></div>
         </form>
       </div>
 
+      <!-- Admin Dashboard View -->
       <div id="admin-dashboard-view" class="hidden">
         <div class="admin-header">
           <h2>Admin Dashboard</h2>
           <div class="admin-actions">
             <button id="btn-add-scheme" class="btn btn-primary">+ Add New Scheme</button>
-            <button id="btn-view-audit" class="btn btn-secondary">Audit Logs</button>
             <button id="btn-bulk-import" class="btn btn-secondary">Bulk Import</button>
             <button id="btn-logout" class="btn btn-danger">Logout</button>
           </div>
         </div>
 
-        <div class="admin-table-container">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Ministry / Level</th>
-                <th>Domain</th>
-                <th>Benefit</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="admin-schemes-tbody">
-              <!-- Loaded dynamically -->
-            </tbody>
-          </table>
+        <!-- Admin Sub-Navigation -->
+        <div class="admin-subnav">
+          <button class="admin-subnav-btn active" data-admin-panel="panel-schemes">Schemes (<span id="admin-schemes-count">0</span>)</button>
+          <button class="admin-subnav-btn" data-admin-panel="panel-users">Users (<span id="admin-users-count">0</span>)</button>
+          <button class="admin-subnav-btn" data-admin-panel="panel-apps">Applications (<span id="admin-apps-count">0</span>)</button>
+          <button class="admin-subnav-btn" data-admin-panel="panel-requests">Services & Donations (<span id="admin-requests-count">0</span>)</button>
+          <button class="admin-subnav-btn" data-admin-panel="panel-feedback">Feedback (<span id="admin-feedback-count">0</span>)</button>
+          <button class="admin-subnav-btn" data-admin-panel="panel-audit">Audit Logs</button>
+        </div>
+
+        <!-- Panel 1: Schemes -->
+        <div id="panel-schemes" class="admin-panel active">
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Ministry / Level</th>
+                  <th>Domain</th>
+                  <th>Benefit</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-schemes-tbody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel 2: Users -->
+        <div id="panel-users" class="admin-panel hidden">
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>State / Education</th>
+                  <th>Apps</th>
+                  <th>Docs</th>
+                  <th>Joined</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel 3: Applications -->
+        <div id="panel-apps" class="admin-panel hidden">
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>App ID</th>
+                  <th>User</th>
+                  <th>Scheme</th>
+                  <th>Status</th>
+                  <th>Applied Date</th>
+                  <th>Notes</th>
+                  <th>Last Updated</th>
+                </tr>
+              </thead>
+              <tbody id="admin-apps-tbody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel 4: Service Requests & Donations -->
+        <div id="panel-requests" class="admin-panel hidden">
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Request ID</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                  <th>Submitted At</th>
+                </tr>
+              </thead>
+              <tbody id="admin-requests-tbody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel 5: Feedback -->
+        <div id="panel-feedback" class="admin-panel hidden">
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>User</th>
+                  <th>Rating</th>
+                  <th>Message</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="admin-feedback-tbody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel 6: Audit Logs -->
+        <div id="panel-audit" class="admin-panel hidden">
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Action Details</th>
+                </tr>
+              </thead>
+              <tbody id="audit-logs-tbody">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- MODAL: ADD/EDIT SCHEME -->
-  <div id="scheme-modal" class="modal hidden">
+  <!-- ========================================================================= -->
+  <!-- MODALS FOR SECONDARY SERVICES & DIALOGS -->
+  <!-- ========================================================================= -->
+
+  <!-- MODAL: STUDENT AUTHENTICATION / LOGIN -->
+  <div id="auth-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+    <div class="modal-content" style="max-width: 460px;">
+      <span class="close-btn" id="auth-modal-close" aria-label="Close modal">&times;</span>
+      <h2 id="auth-modal-title">Student Account Access</h2>
+      <p class="subtitle">Sign in to save your eligibility criteria, track applications, and maintain your document vault.</p>
+      
+      <!-- Google Sign In Button Container -->
+      <div id="google-btn-slot" class="google-auth-slot">
+        <button type="button" id="modal-google-fake-btn" class="google-signin-btn">
+          <svg class="google-icon" width="18" height="18" viewBox="0 0 48 48">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.79l7.97-6.2z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            <path fill="none" d="M0 0h48v48H0z"/>
+          </svg>
+          <span>Sign in with Google</span>
+        </button>
+      </div>
+      <div id="google-config-note" class="hidden" style="display:none !important;"></div>
+
+      <div class="divider-text"><span>OR LOCAL TEST SIGN-IN</span></div>
+
+      <form id="dev-login-form">
+        <div class="form-group">
+          <label for="dev-email">Student Email</label>
+          <input type="email" id="dev-email" placeholder="student@example.com" value="student@india.gov.in" required>
+        </div>
+        <div class="form-group">
+          <label for="dev-name">Full Name</label>
+          <input type="text" id="dev-name" placeholder="Your Name" value="Aarav Sharma" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Continue to Account</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: MY PROFILE -->
+  <div id="profile-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+    <div class="modal-content" style="max-width: 600px;">
+      <span class="close-btn" id="profile-modal-close" aria-label="Close modal">&times;</span>
+      <h2 id="profile-modal-title">My Student Profile</h2>
+      <p class="subtitle">Save your eligibility information here once so you don't need to re-enter it each time.</p>
+      <form id="profile-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="prof-state">State / UT</label>
+            <select id="prof-state" name="state">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="prof-category">Social Category</label>
+            <select id="prof-category" name="category">
+              <option value="All">All / General</option>
+              <option value="SC">Scheduled Caste (SC)</option>
+              <option value="ST">Scheduled Tribe (ST)</option>
+              <option value="OBC">Other Backward Class (OBC)</option>
+              <option value="Minority">Minority Communities</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="prof-gender">Gender</label>
+            <select id="prof-gender" name="gender">
+              <option value="Any">Any Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="prof-age">Age (Years)</label>
+            <input type="number" id="prof-age" name="age" min="0" max="120" placeholder="e.g. 21">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="prof-income">Annual Household Income (₹)</label>
+            <input type="number" id="prof-income" name="income" min="0" placeholder="e.g. 180000">
+          </div>
+          <div class="form-group">
+            <label for="prof-disability">Specially-Abled (40%+ Disability)?</label>
+            <select id="prof-disability" name="disability">
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="prof-occupation">Occupation</label>
+            <select id="prof-occupation" name="occupation">
+              <option value="Any">Any / Other</option>
+              <option value="Student">Student</option>
+              <option value="Farmer">Farmer</option>
+              <option value="Unemployed">Unemployed</option>
+              <option value="Employed">Employed / Salaried</option>
+              <option value="Self-employed">Self-employed</option>
+              <option value="Unorganised worker">Unorganised Sector Worker</option>
+              <option value="Artisan / Craftsperson">Artisan / Craftsperson</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="prof-education">Highest Education Level</label>
+            <select id="prof-education" name="education">
+              <option value="Any">Any / Other</option>
+              <option value="School">School Education (Class 1-12)</option>
+              <option value="ITI">ITI Course</option>
+              <option value="Diploma">Diploma Course</option>
+              <option value="UG">Undergraduate (UG)</option>
+              <option value="PG">Postgraduate (PG)</option>
+              <option value="PhD">Doctoral / PhD</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="prof-domain">Preferred Domain / Field of Study</label>
+          <select id="prof-domain" name="domain">
+            <option value="">All Domains</option>
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Save Profile Details</button>
+        <div id="profile-success" class="success-text hidden">Profile updated successfully!</div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: APPLICATION TRACKER -->
+  <div id="tracker-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="tracker-modal-title">
+    <div class="modal-content large">
+      <span class="close-btn" id="tracker-modal-close" aria-label="Close modal">&times;</span>
+      <h2 id="tracker-modal-title">Scholarship Application Tracker</h2>
+      <p class="subtitle">Monitor deadlines, submission dates, notes, and progress of all your scholarship applications.</p>
+      
+      <div id="tracker-content">
+        <div class="admin-table-container">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Scheme Name</th>
+                <th>Status</th>
+                <th>Applied Date</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tracker-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: QUICK APPLICATION ADD / EDIT -->
+  <div id="quick-app-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="quick-app-title">
+    <div class="modal-content" style="max-width: 500px;">
+      <span class="close-btn" id="quick-app-close" aria-label="Close modal">&times;</span>
+      <h2 id="quick-app-title">Track Application</h2>
+      <p class="subtitle" id="quick-app-scheme-name">Scheme</p>
+      <form id="quick-app-form">
+        <input type="hidden" id="quick-app-scheme-id">
+        <input type="hidden" id="quick-app-id">
+        <div class="form-group">
+          <label for="quick-app-status">Current Status</label>
+          <select id="quick-app-status" required>
+            <option value="Not Started">Not Started</option>
+            <option value="Preparing">Preparing Documents</option>
+            <option value="Applied">Applied</option>
+            <option value="Under Review">Under Review</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="quick-app-notes">Notes / Application Reference No.</label>
+          <textarea id="quick-app-notes" rows="3" placeholder="e.g. Reference No: NSP-2026-88192, verified by college on Oct 12"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Save to Tracker</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: DOCUMENT VAULT -->
+  <div id="vault-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="vault-modal-title">
+    <div class="modal-content large">
+      <span class="close-btn" id="vault-modal-close" aria-label="Close modal">&times;</span>
+      <h2 id="vault-modal-title">Document Vault</h2>
+      <p class="subtitle">Securely store certificates and documents required for scholarship verification (Aadhaar, Income, Caste, Marksheets). Max 5MB per file (PDF/PNG/JPG).</p>
+
+      <div class="vault-upload-box">
+        <h3>Upload Verified Document</h3>
+        <form id="vault-upload-form" class="form-row" style="align-items: flex-end; margin-top: 10px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="doc-type-select">Document Category</label>
+            <select id="doc-type-select" required>
+              <option value="Aadhaar">Aadhaar Card</option>
+              <option value="Income Certificate">Income Certificate</option>
+              <option value="Caste Certificate">Caste Certificate</option>
+              <option value="Domicile Certificate">Domicile / Residence Certificate</option>
+              <option value="Marksheet">Marksheet / Grade Card</option>
+              <option value="Bank Passbook">Bank Passbook / Cancelled Cheque</option>
+              <option value="Disability Certificate">Disability Certificate (40%+)</option>
+              <option value="Bonafide Certificate">College Bonafide Certificate</option>
+              <option value="Other">Other Supporting Document</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="doc-file-input">Choose File (PDF, PNG, JPG)</label>
+            <input type="file" id="doc-file-input" accept=".pdf,.png,.jpg,.jpeg" required>
+          </div>
+          <button type="submit" id="btn-upload-doc" class="btn btn-primary">Upload to Vault</button>
+        </form>
+        <div id="vault-error" class="error-text hidden"></div>
+        <div id="vault-success" class="success-text hidden"></div>
+      </div>
+
+      <div class="admin-table-container" style="margin-top: 20px;">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Document Type</th>
+              <th>Filename</th>
+              <th>File Size</th>
+              <th>Uploaded Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="vault-tbody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOTIFICATIONS / ALERTS -->
+  <div id="notif-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="notif-modal-title">
+    <div class="modal-content" style="max-width: 550px;">
+      <span class="close-btn" id="notif-modal-close" aria-label="Close modal">&times;</span>
+      <div class="results-header" style="margin-bottom: 10px;">
+        <h2 id="notif-modal-title">Alerts & Notifications</h2>
+        <button id="btn-mark-all-read" class="btn btn-secondary btn-sm">Mark all as read</button>
+      </div>
+      <div id="notif-list" class="notif-list-container">
+        <!-- Loaded dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DONATION (HONEST PLEDGE & TAX-EXEMPT 80G INFORMATION) -->
+  <div id="donation-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="donation-modal-title">
+    <div class="modal-content" style="max-width: 500px;">
+      <span class="close-btn" id="donation-modal-close" aria-label="Close modal">&times;</span>
+      <h2 id="donation-modal-title">Support Scheme Matcher</h2>
+      <p class="subtitle">Scheme Matcher is an open public-interest platform. We register genuine donation pledges and issue verified 80G tax exemption receipts.</p>
+      
+      <div class="info-box">
+        💡 <strong>Transparency Notice:</strong> We do not charge arbitrary card processing fees. Once you register your intent, our accounts coordinator provides direct verified UPI and NEFT bank account details.
+      </div>
+
+      <form id="donation-form" style="margin-top: 15px;">
+        <div class="form-group">
+          <label for="don-amount">Donation Pledge Amount (₹) *</label>
+          <input type="number" id="don-amount" min="100" placeholder="e.g. 1000" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="don-name">Full Name *</label>
+            <input type="text" id="don-name" placeholder="Name for 80G receipt" required>
+          </div>
+          <div class="form-group">
+            <label for="don-email">Email Address *</label>
+            <input type="email" id="don-email" placeholder="receipt@example.com" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="don-pan">PAN Number (Optional, for 80G tax deduction)</label>
+          <input type="text" id="don-pan" placeholder="ABCDE1234F">
+        </div>
+        <div class="form-group">
+          <label for="don-message">Encouraging Message (Optional)</label>
+          <textarea id="don-message" rows="2" placeholder="Leave a message for the team..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Register Donation Pledge</button>
+        <div id="donation-status" class="success-text hidden"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: VOLUNTEER -->
+  <div id="volunteer-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="volunteer-modal-title">
+    <div class="modal-content" style="max-width: 500px;">
+      <span class="close-btn" id="volunteer-modal-close" aria-label="Close modal">&times;</span>
+      <h2 id="volunteer-modal-title">Volunteer With Us</h2>
+      <p class="subtitle">Help Indian students from rural areas identify and apply for life-changing scholarships.</p>
+      
+      <form id="volunteer-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="vol-name">Full Name *</label>
+            <input type="text" id="vol-name" placeholder="Your name" required>
+          </div>
+          <div class="form-group">
+            <label for="vol-email">Email Address *</label>
+            <input type="email" id="vol-email" placeholder="you@example.com" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="vol-interests">Areas You Can Help With *</label>
+          <select id="vol-interests" required>
+            <option value="Scholarship Verification">Verifying Scholarship Guidelines & Deadlines</option>
+            <option value="Application Assistance">Helping Students Fill Online Forms</option>
+            <option value="Language Translation">Regional Language Translation (Hindi, Tamil, etc.)</option>
+            <option value="Community Outreach">College & Rural Outreach</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="vol-availability">Weekly Availability</label>
+          <select id="vol-availability">
+            <option value="1-2 hours/week">1-2 hours / week</option>
+            <option value="3-5 hours/week">3-5 hours / week</option>
+            <option value="5+ hours/week">5+ hours / week</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="vol-message">Brief Introduction</label>
+          <textarea id="vol-message" rows="2" placeholder="Tell us about your background or why you'd like to volunteer..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Submit Volunteer Application</button>
+        <div id="volunteer-status" class="success-text hidden"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: FEEDBACK -->
+  <div id="feedback-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
+    <div class="modal-content" style="max-width: 480px;">
+      <span class="close-btn" id="feedback-modal-close" aria-label="Close modal">&times;</span>
+      <h2 id="feedback-modal-title">Share Your Feedback</h2>
+      <p class="subtitle">Tell us how we can improve Scheme Matcher for students across India.</p>
+      
+      <form id="feedback-form">
+        <div class="form-group">
+          <label>How satisfied are you with the scholarship recommendations?</label>
+          <div class="rating-stars" id="feedback-stars">
+            <label><input type="radio" name="rating" value="5" checked> ⭐⭐⭐⭐⭐ (5/5)</label><br>
+            <label><input type="radio" name="rating" value="4"> ⭐⭐⭐⭐ (4/5)</label><br>
+            <label><input type="radio" name="rating" value="3"> ⭐⭐⭐ (3/5)</label><br>
+            <label><input type="radio" name="rating" value="2"> ⭐⭐ (2/5)</label><br>
+            <label><input type="radio" name="rating" value="1"> ⭐ (1/5)</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="fb-message">Your Comments & Suggestions *</label>
+          <textarea id="fb-message" rows="4" placeholder="What worked well? What schemes should we add?" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Send Feedback</button>
+        <div id="feedback-status" class="success-text hidden"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD/EDIT SCHEME (ADMIN) -->
+  <div id="scheme-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-content">
-      <span class="close-btn" id="modal-close">&times;</span>
+      <span class="close-btn" id="modal-close" aria-label="Close modal">&times;</span>
       <h2 id="modal-title">Add New Scheme</h2>
       <form id="scheme-form">
         <input type="hidden" id="scheme-form-id">
@@ -352,39 +989,20 @@
     </div>
   </div>
 
-  <!-- MODAL: AUDIT LOGS -->
-  <div id="audit-modal" class="modal hidden">
-    <div class="modal-content large">
-      <span class="close-btn" id="audit-modal-close">&times;</span>
-      <h2>System Audit Logs (Last 100 Actions)</h2>
-      <div class="audit-log-container">
-        <table class="audit-table">
-          <thead>
-            <tr>
-              <th>Timestamp</th>
-              <th>Action Details</th>
-            </tr>
-          </thead>
-          <tbody id="audit-logs-tbody">
-            <!-- Loaded dynamically -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: BULK IMPORT -->
-  <div id="bulk-modal" class="modal hidden">
+  <!-- MODAL: BULK IMPORT (ADMIN) -->
+  <div id="bulk-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="bulk-modal-title">
     <div class="modal-content">
-      <span class="close-btn" id="bulk-modal-close">&times;</span>
-      <h2>Bulk Import Schemes (JSON Array)</h2>
-      <p class="subtitle">Paste a JSON array containing scheme objects. Each object should follow the database format.</p>
+      <span class="close-btn" id="bulk-modal-close" aria-label="Close modal">&times;</span>
+      <h2 id="bulk-modal-title">Bulk Import Schemes (JSON Array)</h2>
+      <p class="subtitle">Paste a JSON array containing scheme objects.</p>
       <form id="bulk-import-form">
         <div class="form-group">
           <textarea id="bulk-json-input" rows="12" placeholder='[
   {
     "name": "Scheme Name",
     "shortDesc": "Description",
+    "ministry": "Ministry of Education",
+    "domain": "education",
     ...
   }
 ]' required></textarea>
@@ -396,12 +1014,81 @@
     </div>
   </div>
 
+  <!-- FOOTER -->
   <footer class="footer">
     <div class="container footer-container">
-      <p>&copy; 2026 Scheme Matcher. All Rights Reserved.</p>
-      <p class="disclaimer">⚠️ Disclaimer: Data presented here is for illustrative and matching demo purposes. Please check the official government websites before applying for any scheme.</p>
+      <p>&copy; 2026 Government Scheme Matcher. All Rights Reserved.</p>
+      <p class="disclaimer">⚠️ Disclaimer: Information provided here is compiled for public awareness and discovery. Always verify specific criteria and submission procedures on the official government portals before applying.</p>
     </div>
   </footer>
+
+  <!-- AI ASSISTANT & VOICE GUIDANCE WIDGET -->
+  <div id="ai-assistant-widget" class="ai-widget-wrapper" style="display:none">
+    <!-- Floating Trigger Button -->
+    <button type="button" id="ai-assistant-toggle" class="ai-launcher-btn" aria-label="Open AI and Voice Assistant" title="Need help? Ask SchemeMitra AI & Voice Assistant">
+      <span class="ai-launcher-pulse"></span>
+      <span class="ai-launcher-icon">🤖</span>
+      <span class="ai-launcher-label">Ask AI Guide</span>
+      <span class="ai-launcher-badge">🎙️ Voice</span>
+    </button>
+
+    <!-- Chat & Voice Window -->
+    <div id="ai-assistant-container" class="ai-chat-window hidden" role="dialog" aria-modal="false" aria-labelledby="ai-chat-title">
+      <div class="ai-chat-header">
+        <div class="ai-header-left">
+          <div class="ai-avatar">
+            <span>🇮🇳</span>
+            <span class="ai-status-dot"></span>
+          </div>
+          <div class="ai-header-info">
+            <h3 id="ai-chat-title">SchemeMitra AI</h3>
+            <span class="ai-subtitle">Voice &amp; Scheme Guidance</span>
+          </div>
+        </div>
+        <div class="ai-header-actions">
+          <button type="button" id="ai-voice-toggle" class="ai-icon-btn active" title="Toggle Voice Output (Speech Narration)" aria-label="Toggle Voice Output">🔊</button>
+          <button type="button" id="ai-clear-btn" class="ai-icon-btn" title="Clear Chat History" aria-label="Clear Chat History">🗑️</button>
+          <button type="button" id="ai-close-btn" class="ai-icon-btn" title="Close Assistant" aria-label="Close Assistant">&times;</button>
+        </div>
+      </div>
+
+      <!-- Quick Action Chips -->
+      <div id="ai-suggestion-chips" class="ai-chips-area">
+        <button type="button" class="ai-chip" data-prompt="Start guided tour">🧭 Guided Tour</button>
+        <button type="button" class="ai-chip" data-prompt="Find scholarships for me">🎓 Find Scholarships</button>
+        <button type="button" class="ai-chip" data-prompt="What documents do I need for NSP?">📄 NSP Documents</button>
+        <button type="button" class="ai-chip" data-prompt="Open Services menu">⚡ Open Services</button>
+        <button type="button" class="ai-chip" data-prompt="Open Document Vault">🔒 Document Vault</button>
+      </div>
+
+      <!-- Messages Area -->
+      <div id="ai-chat-messages" class="ai-messages-list">
+        <div class="ai-msg ai-msg-bot">
+          <div class="ai-msg-bubble">
+            <strong>Namaste! 🙏 I am SchemeMitra</strong>, your personal AI &amp; Voice Guide for Indian government scholarships.
+            <br><br>
+            You can type your query or click the <strong>🎙️ Mic button</strong> to speak. Say <em>"Start guided tour"</em> for an interactive walkthrough of this portal!
+          </div>
+        </div>
+      </div>
+
+      <!-- Voice Listening Visualizer Banner -->
+      <div id="ai-speech-indicator" class="ai-speech-bar hidden">
+        <div class="ai-sound-waves">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <span class="ai-speech-text">Listening... speak in English or Hindi</span>
+        <button type="button" id="ai-speech-cancel" class="ai-speech-stop-btn">✕</button>
+      </div>
+
+      <!-- Chat Input Form -->
+      <form id="ai-chat-form" class="ai-input-bar">
+        <button type="button" id="ai-mic-btn" class="ai-mic-btn" title="Speak to Assistant (Voice Input)" aria-label="Speak to Assistant">🎙️</button>
+        <input type="text" id="ai-chat-input" placeholder="Ask about scholarships or say 'Start tour'..." autocomplete="off" required>
+        <button type="submit" id="ai-send-btn" class="ai-send-btn" title="Send query" aria-label="Send message">➤</button>
+      </form>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
