@@ -690,180 +690,401 @@ function serveStatic(req, res, pathname) {
 // ---------------------------------------------------------------------------
 // AI ASSISTANT & VOICE GUIDANCE ENGINE
 // ---------------------------------------------------------------------------
+const AI_STOP_WORDS = new Set([
+  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'am', 'be', 'been', 'being',
+  'in', 'on', 'at', 'to', 'for', 'with', 'about', 'against', 'between', 'into',
+  'through', 'during', 'before', 'after', 'above', 'below', 'from', 'up', 'down',
+  'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here',
+  'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few',
+  'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
+  'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don',
+  'should', 'now', 'what', 'which', 'who', 'whom', 'this', 'that', 'these',
+  'those', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'you', 'your',
+  'yours', 'he', 'him', 'his', 'she', 'her', 'hers', 'it', 'its', 'they',
+  'them', 'their', 'theirs', 'give', 'tell', 'show', 'find', 'help', 'please',
+  'need', 'want', 'know', 'scheme', 'schemes', 'yojana', 'government', 'portal',
+  'india', 'indian', 'apply', 'applying', 'avail', 'available', 'eligibility',
+  'eligible', 'details', 'detail', 'information', 'info'
+]);
+
+function extractSearchTokens(str) {
+  return (str || '').toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 1 && !AI_STOP_WORDS.has(w));
+}
+
+function formatSchemeSummary(s) {
+  return {
+    id: s.id,
+    name: s.name,
+    ministry: s.ministry || '',
+    domain: s.domain || 'general',
+    benefit: s.benefit || '',
+    benefitType: s.benefitType || 'Scheme',
+    incomeMax: s.incomeMax || null,
+    applyUrl: s.applyUrl || '',
+    deadline: s.deadline || 'Rolling'
+  };
+}
+
 function generateAIResponse(query) {
-  const q = (query || '').toLowerCase().trim();
+  const raw = (query || '').trim();
+  const q = raw.toLowerCase();
   const allSchemes = getAllSchemeRows().filter(s => s.active);
 
   // 1. GREETINGS & INTRO
-  if (!q || /^(hi|hello|hey|namaste|greetings|good\s+(morning|afternoon|evening)|who are you)/i.test(q)) {
+  if (!q || /^(hi|hello|hey|namaste|greetings|good\s+(morning|afternoon|evening)|who are you|kya haal hai|help me)/i.test(q)) {
     return {
-      reply: `**Namaste! I am SchemeMitra**, your AI & Voice Assistant for Indian government welfare schemes and scholarships.\n\nHere is what I can do for you:\n- 🎯 **Find Scholarships**: Tell me your state, category, or course.\n- 🧭 **Guide You**: Say *"Start guided tour"* to explore all features.\n- 📂 **Documents**: Ask about required certificates for any scheme.\n- 🚀 **Quick Actions**: Say *"Open tracker"*, *"Open vault"*, or *"Show services"*.`,
-      voiceText: "Namaste! I am SchemeMitra, your AI and Voice Assistant. How can I help you today? You can ask me to find scholarships, check required documents, or say 'Start tour' to explore the website.",
+      reply: `**Namaste! I am SchemeMitra**, your AI & Voice Guide for Indian government welfare schemes and scholarships.\n\nHere is what I can do for you:\n- 🎓 **Find Scholarships**: Tell me your state, social category, or current course.\n- 🌾 **Sector Schemes**: Ask about farming, healthcare, housing, business loans, or pensions.\n- 🧭 **Guided Tour**: Say *"Start guided tour"* to walk through all features.\n- 📄 **Document Checklist**: Ask about documents required for NSP or state portals.\n- ⚡ **Portal Shortcuts**: Say *"Open tracker"*, *"Open vault"*, or *"Show services"*.`,
+      voiceText: "Namaste! I am SchemeMitra, your AI and Voice Guide. You can ask me to find scholarships, check welfare schemes for farmers or women, or say 'Start guided tour' to explore the portal.",
       action: null,
-      chips: ["Start guided tour 🧭", "Find scholarships for me 🎓", "What documents for NSP? 📄", "Open Services menu ⚡"]
+      schemes: [],
+      chips: ["Start guided tour 🧭", "Find scholarships for me 🎓", "Schemes for Farmers 🌾", "Ayushman Bharat Health 🏥", "Business & MSME Loans 💼", "What documents for NSP? 📄"]
     };
   }
 
   // 2. GUIDED TOUR & WEBSITE OVERVIEW
   if (/(tour|guided tour|guide me|walkthrough|how to use|show me around|overview|help me navigate|navigate)/i.test(q)) {
     return {
-      reply: `### 🧭 Welcome to the Interactive Portal Tour!\n\nHere are the 4 main tools to help you secure scholarships:\n\n1. **🎯 Eligibility Matcher**: Use the form below to enter your state, caste, education, and family income. We rank the best schemes with an explainability breakdown.\n2. **⚡ Services Hub**: Access the top menu to view all quick services.\n3. **📋 Application Tracker**: Keep logs of your scholarship application numbers, dates, and verification progress.\n4. **🔒 Document Vault**: Upload and store your income certificate, caste certificate, Aadhaar, and marksheets safely.\n\n*Click below or say a command to jump directly into any section!*`,
+      reply: `### 🧭 Welcome to the Interactive Portal Tour!\n\nHere are the 4 main tools to help you discover and track welfare benefits:\n\n1. **🎯 Eligibility Matcher**: Fill out your state, caste, education, and household income in the questionnaire to get ranked, explainable matches.\n2. **⚡ Services Hub**: Access the top navigation bar for your student suite.\n3. **📋 Application Tracker**: Monitor submission numbers, verification stages, and deadlines across NSP and state portals.\n4. **🔒 Document Vault**: Store your income certificate, caste certificate, Aadhaar, and marksheets securely in your browser.\n\n*Click below or say a command to jump directly into any section!*`,
       voiceText: "Welcome to Government Scheme Matcher! I can guide you through our portal. First, use our Eligibility Matcher to discover scholarships tailored to your profile. Second, check the Services menu for your Application Tracker and Document Vault. Where would you like to start?",
       action: "START_TOUR",
-      chips: ["Scroll to Matching Form", "Open Services Menu", "Open Application Tracker", "Open Document Vault"]
+      schemes: [],
+      chips: ["Scroll to Matching Form 🎯", "Open Services Menu ⚡", "Open Application Tracker 📋", "Open Document Vault 🔒"]
     };
   }
 
   // 3. NAVIGATIONAL COMMANDS & ACTIONS
-  if (/(service|services|services menu|fancy services|menu)/i.test(q)) {
+  if (/(services menu|fancy services|open services|services dropdown)/i.test(q)) {
     return {
-      reply: `✨ **Opening the Services Menu** for you right now!\n\nFrom here you can access:\n- 🎓 Scholarship Matching\n- 📋 Application Tracker\n- 🔒 Document Vault\n- 🔔 Eligibility Alerts\n- 👤 Student Profile`,
+      reply: `✨ **Opening the Services Menu** for you right now!\n\nFrom here you can access:\n- 🎓 Scholarship Matcher\n- 📋 Application Tracker\n- 🔒 Document Vault\n- 🔔 Eligibility Alerts & Deadlines\n- 👤 Student Profile\n- ❤️ Support & Volunteering`,
       voiceText: "Opening the Services menu for you right now!",
       action: "OPEN_SERVICES",
-      chips: ["Open Tracker", "Open Document Vault", "Check Alerts"]
+      schemes: [],
+      chips: ["Open Tracker 📋", "Open Document Vault 🔒", "Check Alerts 🔔"]
     };
   }
 
-  if (/(track|tracker|application status|my applications|status of application)/i.test(q)) {
+  if (/(track|tracker|application status|my applications|status of application|track status)/i.test(q)) {
     return {
-      reply: `📋 **Opening Application Tracker**!\n\nHere you can monitor all your scholarship submissions across portals like NSP, State E-Kalyan, or AICTE. Add application IDs, update verification stages, and keep notes.`,
-      voiceText: "Opening your Application Tracker modal right now.",
+      reply: `📋 **Opening Application Tracker**!\n\nMonitor your scholarship applications across NSP, State E-Kalyan, or AICTE. Add application reference numbers, track verification stages, and record personal notes.`,
+      voiceText: "Opening your Application Tracker right now.",
       action: "OPEN_MODAL",
       target: "tracker-modal",
-      chips: ["Open Document Vault", "Find more schemes", "Back to Home"]
+      schemes: [],
+      chips: ["Open Document Vault 🔒", "Find scholarships for me 🎓", "Back to Home"]
     };
   }
 
   if (/(vault|document vault|upload documents?|my documents?|files?|certificates?|storage)/i.test(q)) {
     return {
-      reply: `🔒 **Opening Secure Document Vault**!\n\nYou can upload and organize essential files like your **Income Certificate**, **Caste Certificate**, **Aadhaar Card**, and **Marksheets**. Files remain private in your browser session.`,
+      reply: `🔒 **Opening Secure Document Vault**!\n\nYou can upload and organize essential files like your **Income Certificate**, **Caste Certificate**, **Aadhaar Card**, and **Marksheets** (up to 5MB, PDF/PNG/JPG). Files stay securely stored on your device.`,
       voiceText: "Opening your secure Document Vault.",
       action: "OPEN_MODAL",
       target: "vault-modal",
-      chips: ["What documents for NSP?", "Open Tracker", "Find scholarships"]
+      schemes: [],
+      chips: ["What documents for NSP? 📄", "Open Tracker 📋", "Find scholarships 🎓"]
     };
   }
 
-  if (/(alert|alerts|notification|notifications|deadline|closing date)/i.test(q)) {
+  if (/(alert|alerts|notification|notifications|closing date|renewal date)/i.test(q)) {
     return {
-      reply: `🔔 **Opening Eligibility Alerts & Deadlines**!\n\nStay on top of critical renewal dates, opening windows, and state scholarship disbursement alerts.`,
+      reply: `🔔 **Opening Eligibility Alerts & Deadlines**!\n\nStay updated with critical renewal windows, closing deadlines, and state scholarship disbursement alerts.`,
       voiceText: "Opening your Eligibility Alerts and Deadlines.",
       action: "OPEN_MODAL",
-      target: "alerts-modal",
-      chips: ["Open Services Menu", "Check Tracker", "Matching Form"]
+      target: "notif-modal",
+      schemes: [],
+      chips: ["Open Services Menu ⚡", "Check Tracker 📋", "Scroll to Matcher 🎯"]
     };
   }
 
-  if (/(profile|my profile|student profile|my account|details)/i.test(q)) {
+  if (/(profile|my profile|student profile|my account|edit details)/i.test(q)) {
     return {
-      reply: `👤 **Opening Student Profile**!\n\nUpdate your demographic information, domicile state, academic level, and annual family income so your recommendations stay 100% accurate.`,
+      reply: `👤 **Opening Student Profile**!\n\nSave your demographic information, domicile state, academic level, and annual family income so your recommendations stay 100% accurate.`,
       voiceText: "Opening your Student Profile.",
       action: "OPEN_MODAL",
       target: "profile-modal",
-      chips: ["Run Matcher", "Open Tracker", "Close"]
+      schemes: [],
+      chips: ["Run Matcher 🎯", "Open Tracker 📋", "Close"]
     };
   }
 
-  if (/(feedback|review|rating|suggest|contact)/i.test(q)) {
+  if (/(feedback|review|rating|suggest|contact team)/i.test(q)) {
     return {
-      reply: `💬 **Opening Feedback Form**!\n\nYour feedback helps us support more students across India. Share your thoughts or feature suggestions with our team!`,
+      reply: `💬 **Opening Feedback Form**!\n\nYour feedback helps us support more students across India. Share your thoughts, report issues, or suggest new schemes!`,
       voiceText: "Opening the Feedback form.",
       action: "OPEN_MODAL",
       target: "feedback-modal",
-      chips: ["Close", "Start guided tour"]
+      schemes: [],
+      chips: ["Start guided tour 🧭", "Find scholarships 🎓"]
     };
   }
 
-  if (/(match|matching|finder|eligibility|find scheme|find scholarship|check eligible)/i.test(q)) {
+  if (/(run match|scroll to match|find match|matching form|eligibility finder|check eligible|find my schemes)/i.test(q)) {
     return {
-      reply: `🎯 **Taking you to the Eligibility Matcher!**\n\nFill in your **State**, **Caste Category**, **Education Level**, and **Annual Family Income** in the form on the page, then click **'Find My Eligible Schemes'** for ranked recommendations.`,
+      reply: `🎯 **Taking you to the Eligibility Matcher!**\n\nFill in your **State**, **Caste Category**, **Education Level**, and **Annual Family Income** in the form on the page, then click **'Search Matching Schemes'** for ranked recommendations.`,
       voiceText: "Scrolling you down to the Scholarship Eligibility Matcher form.",
       action: "SCROLL_TO_MATCH",
-      chips: ["What documents for NSP?", "Scholarships for OBC", "Scholarships for SC/ST", "Scholarships for Girls"]
+      schemes: [],
+      chips: ["Scholarships for OBC 🎓", "Scholarships for SC/ST 🎓", "Scholarships for Girls 👩‍🎓", "What documents for NSP? 📄"]
     };
   }
 
   // 4. DOCUMENT ADVISORY (COMMON SCHOLARSHIPS / NSP)
-  if (/(what documents?|document list|documents required|nsp documents?|certificate)/i.test(q)) {
+  if (/(what documents?|document list|documents required|nsp documents?|certificate list|bonafide certificate|income certificate|caste certificate)/i.test(q)) {
     return {
-      reply: `### 📄 Standard Documents Required for Indian Government Scholarships:\n\n1. **Aadhaar Card** (Linked with bank account)\n2. **Income Certificate** (Current financial year, issued by Revenue Department / Tehsildar)\n3. **Caste / Category Certificate** (For SC, ST, OBC non-creamy layer, or EWS)\n4. **Previous Academic Marksheet** (With minimum 50%–60% marks as required)\n5. **Bank Passbook** (Student's active savings account with IFSC code)\n6. **Bonafide Student Certificate** / College ID (From current enrolled school/institute)\n7. **Fee Receipt / Admission Letter** (For post-matric & technical degree schemes)\n\n*Tip: Store copies in your **Document Vault** for quick access when portals open!*`,
+      reply: `### 📄 Standard Documents Required for Indian Government Scholarships:\n\n1. **Aadhaar Card** (Linked with bank account for Direct Benefit Transfer / DBT)\n2. **Income Certificate** (Current financial year, issued by Revenue Department / Tehsildar)\n3. **Caste / Category Certificate** (For SC, ST, OBC non-creamy layer, or EWS)\n4. **Previous Academic Marksheet** (With minimum 50%–60% marks as prescribed)\n5. **Bank Passbook** (Active student savings account with IFSC code)\n6. **Bonafide Student Certificate** / College ID (From current enrolled school/institute)\n7. **Fee Receipt / Admission Letter** (For post-matric & technical degree schemes)\n\n*Tip: Store copies in your **Document Vault** for quick access when portals open!*`,
       voiceText: "For government scholarships, you typically need your Aadhaar card, current income certificate, caste certificate if applicable, previous academic marksheet, bank passbook, and bonafide student certificate from your institute.",
       action: null,
+      schemes: [],
       chips: ["Open Document Vault 🔒", "Find scholarships for me 🎓", "Start guided tour 🧭"]
     };
   }
 
-  // 5. CATEGORY & DEMOGRAPHIC FILTERING
+  // 5. WELFARE DOMAIN INTENTS
+  // 5A. AGRICULTURE & FARMERS
+  if (/\b(farm|farmer|farmers|farming|agriculture|crop|crops|kisan|krishi|mandis?|soil|harvest|landholding)\b/i.test(q)) {
+    const agriSchemes = allSchemes.filter(s => s.domain === 'agriculture' || (Array.isArray(s.occupation) && s.occupation.includes('Farmer')));
+    const top = agriSchemes.slice(0, 3);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+    return {
+      reply: `### 🌾 Schemes for Farmers & Agriculture:\n\n${list}\n\nKey Highlights:\n- **PM-KISAN**: Direct income support of ₹6,000/year in 3 tranches to landholding farmers.\n- **PM Fasal Bima Yojana**: Comprehensive crop insurance against natural calamities.\n- **Kisan Credit Card**: Concessional institutional credit for crop cultivation.\n\n*Explore detailed criteria or apply via official links below.*`,
+      voiceText: `Found ${agriSchemes.length} schemes supporting farmers, including PM-KISAN, PM Fasal Bima Yojana, and Kisan Credit Card.`,
+      action: null,
+      schemes: top.map(formatSchemeSummary),
+      chips: ["PM Kisan details 🌾", "Crop Insurance (PMFBY) 🛡️", "Kisan Credit Card 💳", "Scroll to Matcher 🎯"]
+    };
+  }
+
+  // 5B. HEALTH & MEDICAL
+  if (/\b(health|medical|hospital|hospitalisation|treatment|ayushman|pm-?jay|doctor|illness|healthcare|insurance)\b/i.test(q)) {
+    const healthSchemes = allSchemes.filter(s => s.domain === 'health');
+    const top = healthSchemes.slice(0, 3);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+    return {
+      reply: `### 🏥 Health & Medical Welfare Schemes:\n\n${list}\n\n- **Ayushman Bharat PM-JAY**: Provides cashless healthcare coverage up to ₹5 lakh per family per year for secondary and tertiary hospitalization across 28,000+ empanelled hospitals.\n- **Eligibility**: Low-income households identified through SECC and Ayushman card enrollment at nearest CSC.`,
+      voiceText: "Ayushman Bharat PM-JAY offers cashless hospitalisation cover of up to five lakh rupees per family per year. You can check eligibility and register for an Ayushman card.",
+      action: null,
+      schemes: top.map(formatSchemeSummary),
+      chips: ["Ayushman Bharat Link 🏥", "Required documents 📄", "Scroll to Matcher 🎯"]
+    };
+  }
+
+  // 5C. HOUSING & SHELTER
+  if (/\b(housing|house|home|awas|shelter|pucca house|pmayu|pmay|home loan subsidy)\b/i.test(q)) {
+    const houseSchemes = allSchemes.filter(s => s.domain === 'housing');
+    const top = houseSchemes.slice(0, 3);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+    return {
+      reply: `### 🏠 Housing & Shelter Schemes:\n\n${list}\n\n- **Pradhan Mantri Awas Yojana (Urban & Gramin)**: Provides interest subsidies up to ₹2.67 lakh for first-time home buyers in EWS/LIG/MIG categories.\n- **Eligibility**: Household must not own a pucca house in India; annual income limits apply per category.`,
+      voiceText: "Pradhan Mantri Awas Yojana provides financial assistance and interest subsidies up to 2.67 lakh rupees for buying or constructing a pucca house.",
+      action: null,
+      schemes: top.map(formatSchemeSummary),
+      chips: ["PMAY Urban details 🏠", "Required documents 📄", "Scroll to Matcher 🎯"]
+    };
+  }
+
+  // 5D. WOMEN & CHILD WELFARE
+  if (/\b(girl|girls|female|women|daughter|beti|mahila|widow|maternity|ujjwala|lpg|sukanya)\b/i.test(q)) {
+    const womenSchemes = allSchemes.filter(s => s.gender === 'Female' || s.domain === 'women_child');
+    const top = womenSchemes.slice(0, 4);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+    return {
+      reply: `### 👩‍🎓 Special Schemes for Girls & Women:\n\n${list}\n\nKey Initiatives:\n- **AICTE Pragati**: ₹50,000/year scholarship for female students entering technical diploma/degree programs.\n- **Sukanya Samriddhi Yojana**: High-yield, tax-free savings scheme for girl child education & future.\n- **PM Ujjwala Yojana**: Free LPG connection + first cylinder refill for eligible households.\n- **Working Women Hostels**: Safe, subsidized city accommodation for working women and trainees.`,
+      voiceText: "We have dedicated welfare and scholarship schemes for girls and women, including AICTE Pragati, Sukanya Samriddhi Yojana, and PM Ujjwala Yojana.",
+      action: null,
+      schemes: top.map(formatSchemeSummary),
+      chips: ["AICTE Pragati Scholarship 🎓", "Sukanya Samriddhi Yojana 💰", "PM Ujjwala Yojana 🔥", "Scroll to Matcher 🎯"]
+    };
+  }
+
+  // 5E. BUSINESS, LOANS & ENTREPRENEURSHIP
+  if (/\b(business|startup|startups|entrepreneur|entrepreneurs|enterprise|msme|mudra|loan|loans|pmegp|standup|vishwakarma|credit|artisan|craftsperson)\b/i.test(q)) {
+    const bizSchemes = allSchemes.filter(s => s.domain === 'business' || (s.benefitType && s.benefitType.toLowerCase().includes('loan')));
+    const top = bizSchemes.slice(0, 4);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+    return {
+      reply: `### 💼 Business, Loans & Self-Employment Schemes:\n\n${list}\n\nTop Financial Programs:\n- **PM Mudra Yojana**: Collateral-free micro-loans up to ₹10 lakh (Shishu, Kishor, and Tarun categories).\n- **PMEGP**: Credit-linked subsidy up to 35% for setting up new manufacturing or service units.\n- **Stand-Up India**: Bank loans from ₹10 lakh to ₹1 crore for SC/ST and women entrepreneurs.\n- **PM Vishwakarma**: ₹15,000 modern toolkit grant + subsidized 5% interest collateral-free loans for traditional artisans.`,
+      voiceText: "Government business schemes include Pradhan Mantri Mudra Yojana, PMEGP, Stand-Up India, and PM Vishwakarma for artisans and entrepreneurs.",
+      action: null,
+      schemes: top.map(formatSchemeSummary),
+      chips: ["Mudra Loan details 💳", "PMEGP Subsidy 🏭", "PM Vishwakarma Yojana 🛠️", "Scroll to Matcher 🎯"]
+    };
+  }
+
+  // 5F. PENSIONS & SENIOR CITIZENS
+  if (/\b(pension|pensions|old age|senior citizens?|elderly|atal|apy|retirement|ignoaps|ignwps)\b/i.test(q)) {
+    const pensionSchemes = allSchemes.filter(s => s.domain === 'pension');
+    const top = pensionSchemes.slice(0, 3);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+    return {
+      reply: `### 🪙 Pension & Social Security Schemes:\n\n${list}\n\n- **Atal Pension Yojana (APY)**: Guaranteed monthly pension of ₹1,000–₹5,000/month after age 60 for unorganized sector workers (join between 18–40 years).\n- **National Old Age Pension (IGNOAPS)**: Monthly pension assistance for senior citizens (60+ years) living below the poverty line.`,
+      voiceText: "Government pension schemes include Atal Pension Yojana for unorganised sector workers, and Indira Gandhi National Old Age Pension for BPL senior citizens.",
+      action: null,
+      schemes: top.map(formatSchemeSummary),
+      chips: ["Atal Pension Yojana 🪙", "Old Age Pension 👴", "Scroll to Matcher 🎯"]
+    };
+  }
+
+  // 5G. DISABILITY / DIVYANGJAN
+  if (/\b(disability|disabled|divyang|divyangjan|pwd|handicap|specially abled|udid)\b/i.test(q)) {
+    const pwdSchemes = allSchemes.filter(s => s.disability === 'true' || s.domain === 'disability');
+    const top = pwdSchemes.slice(0, 3);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit}`).join('\n');
+    return {
+      reply: `### ♿ Schemes for Specially-Abled Students & Citizens (Divyangjan):\n\n${list}\n\n- **AICTE Saksham**: ₹50,000/year technical education scholarship for students with 40%+ benchmark disability.\n- **NHFDC Concessional Loans**: Low-interest financial assistance up to ₹25 lakh for self-employment ventures.\n- **National Disability Pension**: Monthly pension for BPL individuals with severe disabilities.`,
+      voiceText: "Found dedicated schemes for specially-abled students and individuals, including AICTE Saksham and NHFDC concessional loans.",
+      action: null,
+      schemes: top.map(formatSchemeSummary),
+      chips: ["AICTE Saksham details ♿", "NHFDC Loan details 💼", "Open Document Vault 🔒"]
+    };
+  }
+
+  // 5H. EMPLOYMENT & SKILL TRAINING
+  if (/\b(employment|job|jobs|skill|skills|training|unemployed|placement|ddu-?gky|kaushalya)\b/i.test(q)) {
+    const empSchemes = allSchemes.filter(s => s.domain === 'employment' || (Array.isArray(s.occupation) && s.occupation.includes('Unemployed')));
+    const top = empSchemes.slice(0, 3);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+    return {
+      reply: `### 🛠️ Employment & Skill Training Schemes:\n\n${list}\n\n- **DDU-GKY (Deen Dayal Upadhyaya Grameen Kaushalya Yojana)**: Free residential skill development training with assured placement assistance for rural youth aged 15–35.`,
+      voiceText: "Employment schemes include DDU-GKY, offering free skill training, boarding, and placement support for rural youth.",
+      action: null,
+      schemes: top.map(formatSchemeSummary),
+      chips: ["DDU-GKY Training details 🛠️", "PMEGP Self-Employment 💼", "Scroll to Matcher 🎯"]
+    };
+  }
+
+  // 6. DEMOGRAPHIC CATEGORY FILTERING (OBC, SC, ST, MINORITY)
   if (/\b(obc|other backward)\b/i.test(q)) {
     const obcSchemes = allSchemes.filter(s => Array.isArray(s.category) ? s.category.includes('OBC') : s.category === 'All');
-    const top = obcSchemes.slice(0, 3);
+    const top = obcSchemes.slice(0, 4);
     const list = top.map(s => `• **${s.name}**: ${s.benefit} (Income limit: ₹${(s.incomeMax||0).toLocaleString('en-IN')})`).join('\n');
     return {
-      reply: `### 🎓 Top Schemes for OBC Students:\n\n${list}\n\n👉 *Need full criteria? Click 'Run Matcher' below with OBC selected.*`,
+      reply: `### 🎓 Top Schemes for OBC Students:\n\n${list}\n\n👉 *Need personalized matches? Use the Matcher form with OBC selected for exact eligibility calculation.*`,
       voiceText: `Found ${obcSchemes.length} schemes supporting OBC students, including Post-Matric Scholarship for OBC and PM YASASVI.`,
       action: null,
+      schemes: top.map(formatSchemeSummary),
       chips: ["Scroll to Matcher 🎯", "Documents required 📄", "Open Services ⚡"]
     };
   }
 
   if (/\b(sc|st|scheduled caste|scheduled tribe)\b/i.test(q)) {
     const scSchemes = allSchemes.filter(s => Array.isArray(s.category) ? (s.category.includes('SC') || s.category.includes('ST')) : s.category === 'All');
-    const top = scSchemes.slice(0, 3);
+    const top = scSchemes.slice(0, 4);
     const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
     return {
-      reply: `### 🎓 Top Schemes for SC & ST Students:\n\n${list}\n\n👉 *Complete tuition assistance and maintenance allowances are provided.*`,
+      reply: `### 🎓 Top Schemes for SC & ST Students:\n\n${list}\n\n👉 *Complete tuition assistance, living allowances, and entrepreneurship loans are available.*`,
       voiceText: `Found ${scSchemes.length} schemes for Scheduled Caste and Scheduled Tribe students, including Post-Matric SC and Top Class Education scheme.`,
       action: null,
-      chips: ["Scroll to Matcher 🎯", "Open Document Vault 🔒", "What documents for NSP?"]
+      schemes: top.map(formatSchemeSummary),
+      chips: ["Scroll to Matcher 🎯", "Open Document Vault 🔒", "What documents for NSP? 📄"]
     };
   }
 
-  if (/\b(girl|girls|female|women|daughter)\b/i.test(q)) {
-    const girlSchemes = allSchemes.filter(s => s.gender === 'Female');
-    const list = girlSchemes.slice(0, 3).map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
+  if (/\b(minority|minorities|muslim|christian|sikh|buddhist|jain|parsi)\b/i.test(q)) {
+    const minSchemes = allSchemes.filter(s => Array.isArray(s.category) && s.category.includes('Minority'));
+    const top = minSchemes.slice(0, 3);
+    const list = top.map(s => `• **${s.name}**: ${s.benefit} (${s.ministry})`).join('\n');
     return {
-      reply: `### 👩‍🎓 Special Schemes for Girls & Women:\n\n${list}\n\n👉 *Including AICTE Pragati Scholarship for technical degrees and Sukanya Samriddhi Yojana.*`,
-      voiceText: "We have dedicated schemes for girl students, such as the AICTE Pragati Scholarship and Begum Hazrat Mahal National Scholarship.",
+      reply: `### 🎓 Scholarships for Minority Community Students:\n\n${list}\n\n- **Pre-Matric & Post-Matric Minority Schemes**: Financial assistance for school and college students belonging to notified minority communities with annual income under ₹1,00,000–₹2,00,000.`,
+      voiceText: "Found dedicated scholarships for minority community students, including Pre-Matric and Post-Matric Minority scholarships.",
       action: null,
-      chips: ["Pragati Scholarship details", "Scroll to Matcher 🎯", "Required documents 📄"]
+      schemes: top.map(formatSchemeSummary),
+      chips: ["Scroll to Matcher 🎯", "What documents for NSP? 📄", "Open Document Vault 🔒"]
     };
   }
 
-  if (/\b(disability|disabled|divyang|pwd|handicap)\b/i.test(q)) {
-    const pwdSchemes = allSchemes.filter(s => s.disability === 'true' || s.disability === 'either');
-    const list = pwdSchemes.slice(0, 3).map(s => `• **${s.name}**: ${s.benefit}`).join('\n');
-    return {
-      reply: `### ♿ Schemes for Specially-Abled Students (Divyangjan):\n\n${list}\n\n👉 *Benchmark 40%+ disability certificate with UDID card is required.*`,
-      voiceText: "Found dedicated welfare and scholarship schemes for specially-abled students, including AICTE Saksham Scholarship.",
-      action: null,
-      chips: ["Scroll to Matcher 🎯", "Open Document Vault 🔒", "How to apply?"]
-    };
+  // 7. SPECIFIC SCHEME LOOKUP (High-Precision Ranking)
+  const queryTokens = extractSearchTokens(q);
+  const ACRONYM_MAP = {
+    'nmms': 'S001',
+    'sc': 'S002',
+    'yasasvi': 'S005',
+    'csss': 'S006',
+    'pragati': 'S009',
+    'saksham': 'S010',
+    'sukanya': 'S011',
+    'ssy': 'S011',
+    'beti bachao': 'S012',
+    'bbbp': 'S012',
+    'pm kisan': 'S013',
+    'pm-kisan': 'S013',
+    'kisan': 'S013',
+    'fasal bima': 'S014',
+    'pmfby': 'S014',
+    'kcc': 'S015',
+    'kisan credit': 'S015',
+    'pmay': 'S016',
+    'awas yojana': 'S016',
+    'ujjwala': 'S017',
+    'pmuy': 'S017',
+    'ayushman': 'S018',
+    'pmjay': 'S018',
+    'pm-jay': 'S018',
+    'atal pension': 'S019',
+    'apy': 'S019',
+    'pmegp': 'S023',
+    'stand up': 'S024',
+    'standup': 'S024',
+    'mudra': 'S025',
+    'ddu gky': 'S026',
+    'ddu-gky': 'S026',
+    'nhfdc': 'S027',
+    'vishwakarma': 'S030'
+  };
+
+  // Direct ID or Acronym Lookup
+  let matchedScheme = null;
+  for (const [phrase, schemeId] of Object.entries(ACRONYM_MAP)) {
+    if (q.includes(phrase)) {
+      matchedScheme = allSchemes.find(s => s.id === schemeId);
+      if (matchedScheme) break;
+    }
   }
 
-  // 6. SPECIFIC SCHEME NAME SEARCH
-  const matchedScheme = allSchemes.find(s => {
-    const name = s.name.toLowerCase();
-    const words = q.replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2);
-    return words.some(w => name.includes(w));
-  });
+  // Token Overlap Scoring if no direct acronym matched
+  if (!matchedScheme && queryTokens.length > 0) {
+    let bestScore = 0;
+    for (const s of allSchemes) {
+      const nameTokens = (s.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/);
+      const descTokens = (s.shortDesc || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/);
+      let score = 0;
+      for (const t of queryTokens) {
+        if (nameTokens.includes(t)) score += 4;
+        else if (nameTokens.some(nt => nt.includes(t))) score += 2;
+        if (descTokens.includes(t)) score += 1;
+      }
+      if (score > bestScore && score >= 4) {
+        bestScore = score;
+        matchedScheme = s;
+      }
+    }
+  }
 
   if (matchedScheme) {
-    const docList = Array.isArray(matchedScheme.documents) ? matchedScheme.documents.join(', ') : 'Standard KYC & academic proofs';
-    const stepsList = Array.isArray(matchedScheme.steps) ? matchedScheme.steps.map((st, i) => `${i+1}. ${st}`).join('\n') : '';
+    const docList = Array.isArray(matchedScheme.documents) && matchedScheme.documents.length > 0
+      ? matchedScheme.documents.join(', ')
+      : 'Standard KYC proofs & academic marksheets';
+    const stepsList = Array.isArray(matchedScheme.steps) && matchedScheme.steps.length > 0
+      ? matchedScheme.steps.map((st, i) => `${i+1}. ${st}`).join('\n')
+      : 'Apply online via the official portal.';
     return {
-      reply: `### 📌 **${matchedScheme.name}**\n\n- **Ministry / Authority**: ${matchedScheme.ministry}\n- **Benefit**: ${matchedScheme.benefit || 'Financial Support'}\n- **Annual Income Ceiling**: ${matchedScheme.incomeMax ? '₹' + matchedScheme.incomeMax.toLocaleString('en-IN') : 'No upper limit'}\n- **Deadline**: ${matchedScheme.deadline || 'Rolling'}\n- **Required Documents**: ${docList}\n\n**Application Steps:**\n${stepsList}\n\n🔗 [Official Portal Link](${matchedScheme.applyUrl})`,
+      reply: `### 📌 **${matchedScheme.name}**\n\n- **Authority / Ministry**: ${matchedScheme.ministry}\n- **Benefit**: ${matchedScheme.benefit || 'Financial Support'}\n- **Annual Income Limit**: ${matchedScheme.incomeMax ? '₹' + matchedScheme.incomeMax.toLocaleString('en-IN') : 'No upper ceiling'}\n- **Application Deadline**: ${matchedScheme.deadline || 'Rolling'}\n- **Required Documents**: ${docList}\n\n**Application Steps:**\n${stepsList}\n\n🔗 [Official Portal Link](${matchedScheme.applyUrl})`,
       voiceText: `${matchedScheme.name} is offered by the ${matchedScheme.ministry}. It provides ${matchedScheme.benefit}. You can apply through the official portal.`,
       action: null,
-      chips: ["Open Application Tracker 📋", "Save documents in Vault 🔒", "Find more schemes 🎓"]
+      schemes: [formatSchemeSummary(matchedScheme)],
+      chips: ["Open Application Tracker 📋", "Save documents in Vault 🔒", "Find more schemes 🎓", "What documents for NSP? 📄"]
     };
   }
 
-  // 7. DEFAULT INTELLIGENT ADVICE
+  // 8. DEFAULT INTELLIGENT ADVICE
   return {
-    reply: `I can help you navigate Indian government scholarships and welfare schemes!\n\nHere are some things you can ask:\n- 🎯 *"What scholarships are available for college students?"*\n- 📋 *"What documents are needed for NSP?"*\n- 🧭 *"Start guided tour of this portal"*\n- ⚡ *"Open Services menu"* or *"Open Document Vault"*`,
-    voiceText: "I am here to guide you with Indian scholarships and website features. You can ask for scholarships by category, check required documents, or say 'Start guided tour'.",
+    reply: `I can help you navigate **Indian government welfare schemes and scholarships**!\n\nHere are some questions you can ask me:\n- 🎯 *"What scholarships are available for college students?"*\n- 🌾 *"What schemes exist for farmers?"*\n- 🏥 *"Tell me about Ayushman Bharat health cover"*\n- 💼 *"What loan subsidies are available for small businesses?"*\n- 📄 *"What documents are needed for NSP?"*\n- 🧭 *"Start guided tour of this portal"*`,
+    voiceText: "I am here to guide you with Indian scholarships and welfare schemes. You can ask for scholarships by category, farming benefits, business loans, or say 'Start guided tour'.",
     action: null,
-    chips: ["Start guided tour 🧭", "Find scholarships for me 🎓", "What documents for NSP? 📄", "Open Services menu ⚡"]
+    schemes: [],
+    chips: ["Start guided tour 🧭", "Find scholarships for me 🎓", "Schemes for Farmers 🌾", "Business & Loans 💼", "What documents for NSP? 📄"]
   };
 }
 
