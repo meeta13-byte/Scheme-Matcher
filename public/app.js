@@ -533,7 +533,6 @@ function updateStudentAuthUI(user, unreadCount = 0) {
     loggedOutBox.classList.add('hidden');
     loggedInBox.classList.remove('hidden');
     // Show AI widget only after login
-    if (aiWidget) aiWidget.style.display = '';
     displayName.textContent = user.name || user.email.split('@')[0];
 
     if (user.picture) {
@@ -560,9 +559,9 @@ function updateStudentAuthUI(user, unreadCount = 0) {
     loggedInBox.classList.add('hidden');
     bellBadge.classList.add('hidden');
     menuBadge.classList.add('hidden');
-    // Hide AI widget when not logged in
-    if (aiWidget) aiWidget.style.display = 'none';
   }
+  // Ensure AI assistant widget is readily accessible
+  if (aiWidget) aiWidget.style.display = '';
 }
 
 async function handleDevLoginSubmit(e) {
@@ -2033,10 +2032,18 @@ async function sendAIMessage(query) {
   const messagesEl = document.getElementById('ai-chat-messages');
   if (!messagesEl) return;
 
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
   // Render User bubble
   const userMsg = document.createElement('div');
   userMsg.className = 'ai-msg ai-msg-user';
-  userMsg.innerHTML = `<div class="ai-msg-bubble">${escapeHtml(query)}</div>`;
+  userMsg.innerHTML = `
+    <div class="ai-msg-bubble">${escapeHtml(query)}</div>
+    <div class="ai-msg-footer" style="justify-content: flex-end;">
+      <span class="ai-msg-time">${timeStr}</span>
+    </div>
+  `;
   messagesEl.appendChild(userMsg);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
@@ -2070,6 +2077,30 @@ async function sendAIMessage(query) {
 
     let formatted = formatAIMarkdown(data.reply || 'Here is what I found for you.');
 
+    // If scheme recommendation cards are returned
+    let schemesCardsHtml = '';
+    if (Array.isArray(data.schemes) && data.schemes.length > 0) {
+      schemesCardsHtml = `
+        <div class="ai-scheme-cards-box">
+          ${data.schemes.map(s => `
+            <div class="ai-mini-scheme-card">
+              <div class="ai-mini-card-head">
+                <span class="ai-mini-domain-tag">${escapeHtml(s.domain || 'Welfare')}</span>
+                <span class="ai-mini-deadline">⏳ ${escapeHtml(s.deadline || 'Rolling')}</span>
+              </div>
+              <h5 class="ai-mini-scheme-title">${escapeHtml(s.name)}</h5>
+              <p class="ai-mini-scheme-benefit">💰 ${escapeHtml(s.benefit || 'Financial Support')}</p>
+              <div class="ai-mini-actions">
+                ${s.applyUrl ? `<a href="${escapeHtml(s.applyUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-light">Apply ↗</a>` : ''}
+                <button type="button" class="btn btn-sm btn-secondary" onclick="trackSchemeFromAI('${escapeHtml(s.id)}', '${escapeHtml(s.name).replace(/'/g, "\\'")}')">Track 📋</button>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="bookmarkSchemeFromAI('${escapeHtml(s.id)}')">Save 🔖</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
     // If an action button is recommended
     let actionBtnHtml = '';
     if (data.action) {
@@ -2084,7 +2115,17 @@ async function sendAIMessage(query) {
       }
     }
 
-    botMsg.innerHTML = `<div class="ai-msg-bubble">${formatted}${actionBtnHtml}</div>`;
+    botMsg.innerHTML = `
+      <div class="ai-msg-bubble">
+        ${formatted}
+        ${actionBtnHtml}
+        ${schemesCardsHtml}
+      </div>
+      <div class="ai-msg-footer">
+        <span class="ai-msg-time">${timeStr}</span>
+        <button type="button" class="ai-msg-copy-btn" onclick="copyAIMessage(this)" title="Copy assistant answer">📋 Copy</button>
+      </div>
+    `;
     messagesEl.appendChild(botMsg);
     messagesEl.scrollTop = messagesEl.scrollHeight;
 
@@ -2106,10 +2147,41 @@ async function sendAIMessage(query) {
     typingMsg.remove();
     const errorMsg = document.createElement('div');
     errorMsg.className = 'ai-msg ai-msg-bot';
-    errorMsg.innerHTML = `<div class="ai-msg-bubble" style="color:#ef4444;">⚠️ <strong>Notice:</strong> ${escapeHtml(err.message)}</div>`;
+    errorMsg.innerHTML = `
+      <div class="ai-msg-bubble" style="color:#ef4444;">⚠️ <strong>Notice:</strong> ${escapeHtml(err.message)}</div>
+      <div class="ai-msg-footer">
+        <span class="ai-msg-time">${timeStr}</span>
+      </div>
+    `;
     messagesEl.appendChild(errorMsg);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
+}
+
+function copyAIMessage(btn) {
+  const bubble = btn.closest('.ai-msg').querySelector('.ai-msg-bubble');
+  if (!bubble) return;
+  const text = bubble.innerText.replace(/Apply ↗|Track 📋|Save 🔖/g, '').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ Copied!';
+    setTimeout(() => { btn.innerHTML = orig; }, 2000);
+  }).catch(() => {
+    showToast('Failed to copy message to clipboard', 'error');
+  });
+}
+
+function trackSchemeFromAI(schemeId, schemeName) {
+  if (!currentStudentToken) {
+    showToast('Sign in or continue as student to track applications!', 'info');
+    toggleModal('auth-modal', true);
+    return;
+  }
+  openQuickAppModal(schemeId, schemeName);
+}
+
+async function bookmarkSchemeFromAI(schemeId) {
+  await toggleBookmark(schemeId);
 }
 
 function updateSuggestionChips(chips) {
@@ -2285,4 +2357,7 @@ function startWebsiteTour() {
 window.startWebsiteTour = startWebsiteTour;
 window.openServicesFromAI = openServicesFromAI;
 window.scrollToMatcherFromAI = scrollToMatcherFromAI;
+window.copyAIMessage = copyAIMessage;
+window.trackSchemeFromAI = trackSchemeFromAI;
+window.bookmarkSchemeFromAI = bookmarkSchemeFromAI;
 
