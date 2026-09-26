@@ -77,12 +77,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Questionnaire form submit
   document.getElementById('matcher-form').addEventListener('submit', handleMatchSubmit);
 
-  // Auto-fill from profile button
+  // Auto-fill from profile and reset buttons
   document.getElementById('btn-autofill-profile').addEventListener('click', autoFillFromProfile);
+  document.getElementById('btn-reset-match').addEventListener('click', resetMatcherForm);
+  document.getElementById('btn-export-results').addEventListener('click', exportMatchesReport);
 
-  // Browse tab search/filter inputs
+  // Browse tab search/filter/sort inputs
   document.getElementById('search-q').addEventListener('input', debounce(handleBrowseFilter, 250));
   document.getElementById('filter-domain').addEventListener('change', handleBrowseFilter);
+  document.getElementById('filter-level').addEventListener('change', handleBrowseFilter);
+  document.getElementById('browse-sort').addEventListener('change', handleBrowseFilter);
 
   // Admin login and sub-tabs
   document.getElementById('admin-login-form').addEventListener('submit', handleAdminLogin);
@@ -404,6 +408,15 @@ function initLoginGate() {
   const gateGoogleBtn = document.getElementById('gate-google-fake-btn');
   if (gateGoogleBtn) {
     gateGoogleBtn.addEventListener('click', () => handleFakeGoogleLogin('gate'));
+  }
+
+  // Continue as Guest button
+  const gateSkipBtn = document.getElementById('gate-skip-btn');
+  if (gateSkipBtn) {
+    gateSkipBtn.addEventListener('click', () => {
+      dismissLoginGate();
+      showToast('Exploring as guest! You can search schemes and chat with SchemeMitra AI.', 'info');
+    });
   }
 
   const slot = document.getElementById('gate-google-btn-slot');
@@ -766,6 +779,8 @@ async function loadBookmarksTab() {
 // ---------------------------------------------------------------------------
 // MATCHING ENGINE FORM & RESULTS
 // ---------------------------------------------------------------------------
+let currentMatchResults = [];
+
 async function handleMatchSubmit(e) {
   e.preventDefault();
   const form = e.target;
@@ -784,6 +799,7 @@ async function handleMatchSubmit(e) {
   };
 
   const resultsList = document.getElementById('results-list');
+  const exportBtn = document.getElementById('btn-export-results');
   resultsList.innerHTML = '<div class="empty-state">⏳ Calculating matches...</div>';
 
   try {
@@ -795,9 +811,15 @@ async function handleMatchSubmit(e) {
 
     if (!res.ok) throw new Error('API Error');
     const data = await res.json();
+    currentMatchResults = data.results || [];
 
     document.getElementById('results-count').textContent = `${data.count} scheme(s) found (${data.eligibleCount} fully eligible)`;
     resultsList.innerHTML = '';
+
+    if (exportBtn) {
+      if (currentMatchResults.length > 0) exportBtn.classList.remove('hidden');
+      else exportBtn.classList.add('hidden');
+    }
 
     if (data.results.length === 0) {
       resultsList.innerHTML = `
@@ -817,6 +839,46 @@ async function handleMatchSubmit(e) {
   }
 }
 
+function resetMatcherForm() {
+  const form = document.getElementById('matcher-form');
+  if (form) form.reset();
+  const resultsList = document.getElementById('results-list');
+  if (resultsList) {
+    resultsList.innerHTML = `
+      <div class="empty-state">
+        <span class="icon">🔍</span>
+        <p>Fill out the questionnaire and click search to view matching government schemes.</p>
+      </div>`;
+  }
+  const countEl = document.getElementById('results-count');
+  if (countEl) countEl.textContent = '0 schemes found';
+  const exportBtn = document.getElementById('btn-export-results');
+  if (exportBtn) exportBtn.classList.add('hidden');
+  currentMatchResults = [];
+  showToast('Questionnaire reset.', 'info');
+}
+
+function exportMatchesReport() {
+  if (!currentMatchResults || currentMatchResults.length === 0) {
+    showToast('No matching schemes to export. Run the search first!', 'info');
+    return;
+  }
+  window.print();
+}
+
+function shareSchemeLink(schemeId, schemeName) {
+  const url = `${window.location.origin}/#scheme-${schemeId}`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast(`Link copied for "${schemeName}"! 📋`, 'success');
+    }).catch(() => {
+      showToast(`Scheme: ${url}`, 'info');
+    });
+  } else {
+    showToast(`Scheme: ${url}`, 'info');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // BROWSE SCHEMES
 // ---------------------------------------------------------------------------
@@ -829,6 +891,10 @@ async function loadAllSchemes() {
 async function handleBrowseFilter() {
   const q = document.getElementById('search-q').value;
   const domain = document.getElementById('filter-domain').value;
+  const levelEl = document.getElementById('filter-level');
+  const level = levelEl ? levelEl.value : '';
+  const sortEl = document.getElementById('browse-sort');
+  const sort = sortEl ? sortEl.value : 'default';
   const container = document.getElementById('browse-list');
 
   try {
@@ -837,7 +903,23 @@ async function handleBrowseFilter() {
     if (domain) url.searchParams.append('domain', domain);
 
     const res = await fetch(url.toString(), { headers: getHeaders() });
-    const schemes = await res.json();
+    let schemes = await res.json();
+
+    if (level) {
+      schemes = schemes.filter(s => s.level === level);
+    }
+
+    if (sort === 'name-asc') {
+      schemes.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    } else if (sort === 'deadline') {
+      schemes.sort((a, b) => {
+        if (a.deadline === 'Rolling') return 1;
+        if (b.deadline === 'Rolling') return -1;
+        return (a.deadline || '').localeCompare(b.deadline || '');
+      });
+    } else if (sort === 'income') {
+      schemes.sort((a, b) => (a.incomeMax || Infinity) - (b.incomeMax || Infinity));
+    }
 
     container.innerHTML = '';
     if (schemes.length === 0) {
@@ -875,7 +957,7 @@ function renderSchemeCard(scheme, hasScore) {
 
   if (hasScore) {
     const badgeClass = isFullyEligible ? 'full' : 'partial';
-    const label = isFullyEligible ? `${scheme.score}% Match (Eligible)` : `${scheme.score}% Match (Partial)`;
+    const label = isFullyEligible ? `⭐ ${scheme.score}% Match (Eligible)` : `⚡ ${scheme.score}% Match (Partial)`;
     scoreHtml = `<span class="score-badge ${badgeClass}">${label}</span>`;
 
     if (scheme.reasons && scheme.reasons.length > 0) {
@@ -934,6 +1016,10 @@ function renderSchemeCard(scheme, hasScore) {
 
       <button class="btn btn-secondary btn-sm" onclick="openQuickAppModal('${scheme.id}', '${escapeHtml(scheme.name).replace(/'/g, "\\'")}')">
         📝 Track Application
+      </button>
+
+      <button class="btn btn-secondary btn-sm" onclick="shareSchemeLink('${scheme.id}', '${escapeHtml(scheme.name).replace(/'/g, "\\'")}')" title="Copy shareable link">
+        🔗 Share
       </button>
       
       <button class="collapsible-trigger" onclick="toggleDetailsCollapse(this)">Show Requirements ↓</button>
@@ -2360,4 +2446,5 @@ window.scrollToMatcherFromAI = scrollToMatcherFromAI;
 window.copyAIMessage = copyAIMessage;
 window.trackSchemeFromAI = trackSchemeFromAI;
 window.bookmarkSchemeFromAI = bookmarkSchemeFromAI;
+window.shareSchemeLink = shareSchemeLink;
 

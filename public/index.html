@@ -55,6 +55,7 @@
             <input type="text" id="gate-name" placeholder="Your Full Name" required autocomplete="name">
           </div>
           <button type="submit" class="btn btn-primary btn-block" id="gate-login-btn">Continue to Scheme Matcher →</button>
+          <button type="button" class="btn btn-secondary btn-block" id="gate-skip-btn" style="margin-top: 10px;">Continue as Guest (Explore Portal) →</button>
           <div id="gate-login-error" class="error-text hidden"></div>
         </form>
       </div>
@@ -178,9 +179,14 @@
               <h2>Find Schemes You Qualify For</h2>
               <p class="subtitle">Fill out your eligibility details below. Our deterministic matching engine calculates score percentages and reasons.</p>
             </div>
-            <button type="button" id="btn-autofill-profile" class="btn btn-secondary btn-sm" title="Populate fields from your saved profile">
-              ⚡ Load from Profile
-            </button>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" id="btn-autofill-profile" class="btn btn-secondary btn-sm" title="Populate fields from your saved profile">
+                ⚡ Load from Profile
+              </button>
+              <button type="button" id="btn-reset-match" class="btn btn-secondary btn-sm" title="Reset questionnaire form">
+                ↺ Reset
+              </button>
+            </div>
           </div>
           
           <form id="matcher-form">
@@ -276,8 +282,13 @@
 
         <div class="results-area">
           <div class="results-header">
-            <h2>Your Matches</h2>
-            <span id="results-count" class="badge">0 schemes found</span>
+            <div>
+              <h2>Your Matches</h2>
+              <span id="results-count" class="badge">0 schemes found</span>
+            </div>
+            <button type="button" id="btn-export-results" class="btn btn-secondary btn-sm hidden" title="Export or print eligible schemes">
+              📄 Export / Print
+            </button>
           </div>
           <div id="results-list" class="results-list">
             <div class="empty-state">
@@ -296,6 +307,17 @@
         <select id="filter-domain" aria-label="Filter by domain">
           <option value="">All Domains</option>
           <!-- Populated dynamically -->
+        </select>
+        <select id="filter-level" aria-label="Filter by administration level">
+          <option value="">All Levels</option>
+          <option value="Central">Central Govt</option>
+          <option value="State">State Govt</option>
+        </select>
+        <select id="browse-sort" aria-label="Sort schemes">
+          <option value="default">Sort: Default</option>
+          <option value="name-asc">Name (A → Z)</option>
+          <option value="deadline">Deadline (Urgent First)</option>
+          <option value="income">Lowest Income Limit</option>
         </select>
       </div>
       <div id="browse-list" class="schemes-grid">

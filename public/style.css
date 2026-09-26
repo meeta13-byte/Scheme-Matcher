@@ -688,17 +688,21 @@ input:focus, select:focus, textarea:focus {
 
 .score-badge {
   color: white;
-  font-weight: bold;
-  padding: 3px 8px;
-  border-radius: 4px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
   font-size: 0.8rem;
   white-space: nowrap;
+  letter-spacing: 0.2px;
 }
 .score-badge.full {
-  background-color: var(--accent-color);
+  background-color: #10b981;
+}
+.score-badge.high {
+  background-color: #2563eb;
 }
 .score-badge.partial {
-  background-color: var(--warning-color);
+  background-color: #f59e0b;
 }
 
 .scheme-ministry {
@@ -854,16 +858,29 @@ input:focus, select:focus, textarea:focus {
 
 /* Search Filters (Browse tab) */
 .search-filters {
-  display: grid;
-  grid-template-columns: 3fr 1fr;
-  gap: 15px;
+  display: flex;
+  gap: 12px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
-@media (max-width: 600px) {
-  .search-filters {
-    grid-template-columns: 1fr;
-  }
+.search-filters input {
+  flex: 3;
+  min-width: 240px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.search-filters select {
+  flex: 1;
+  min-width: 140px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  background-color: white;
 }
 
 .schemes-grid {
@@ -1935,3 +1952,30 @@ fieldset legend {
   0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
   40%           { transform: scale(1); opacity: 1; }
 }
+
+/* Print / Export Report Styles */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .header, .stats-bar, .form-card, .search-filters, .nav,
+  .ai-widget-wrapper, .services-dropdown, .user-auth-area,
+  .modal, .login-gate, .footer, .bookmark-btn, .collapsible-trigger,
+  .btn-outline-light, #btn-export-results, #btn-reset-match {
+    display: none !important;
+  }
+  .main-content, .results-area, #match-tab {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .scheme-card {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #999 !important;
+    margin-bottom: 16px !important;
+  }
+}
+
