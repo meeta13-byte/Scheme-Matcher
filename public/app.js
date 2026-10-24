@@ -65,7 +65,374 @@ function debounce(func, wait) {
 // ---------------------------------------------------------------------------
 // INITIALIZATION ON DOM READY
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// INTERNATIONALIZATION (i18n) — English, Hindi, Marathi, Bengali, Telugu, Tamil, Gujarati
+// ---------------------------------------------------------------------------
+const I18N = {
+  en: {
+    navFind: 'Find Schemes', navBrowse: 'Browse All', navBookmarks: 'Bookmarks',
+    formTitle: 'Find Schemes You Qualify For',
+    formSubtitle: 'Fill out your eligibility details below. Our deterministic matching engine calculates score percentages and reasons.',
+    lblState: 'State / UT', lblCategory: 'Social Category', lblGender: 'Gender',
+    lblAge: 'Age (Years)', lblIncome: 'Annual Household Income (₹)',
+    lblDisability: 'Specially-Abled (Disability 40%+)?',
+    lblOccupation: 'Occupation', lblEducation: 'Highest Education Level',
+    lblDomain: 'Domain of Interest (Optional)', btnSearch: 'Search Matching Schemes',
+    gateHeading: 'Welcome! Please sign in to continue',
+    gateSubtitle: "Discover government schemes and scholarships you're eligible for — free, personalised, and in seconds.",
+    gateGoogle: 'Sign in with Google', gateDivider: 'OR CONTINUE WITH EMAIL',
+    gateEmail: 'Email Address', gateName: 'Full Name',
+    gateContinue: 'Continue to Scheme Matcher →',
+    gateGuest: 'Continue as Guest (Explore Portal) →',
+    gateFooter: '🔒 Your data is stored only on this device. No spam, no tracking.',
+  },
+  hi: {
+    navFind: 'योजनाएँ खोजें', navBrowse: 'सभी देखें', navBookmarks: 'सहेजे गए',
+    formTitle: 'वे योजनाएँ खोजें जिनके लिए आप पात्र हैं',
+    formSubtitle: 'नीचे अपनी पात्रता विवरण भरें। हमारा मैचिंग इंजन स्कोर प्रतिशत और कारण बताता है।',
+    lblState: 'राज्य / केंद्र शासित प्रदेश', lblCategory: 'सामाजिक वर्ग', lblGender: 'लिंग',
+    lblAge: 'आयु (वर्ष)', lblIncome: 'वार्षिक पारिवारिक आय (₹)',
+    lblDisability: 'दिव्यांग (40%+ विकलांगता)?',
+    lblOccupation: 'व्यवसाय', lblEducation: 'उच्चतम शिक्षा स्तर',
+    lblDomain: 'रुचि का क्षेत्र (वैकल्पिक)', btnSearch: 'मिलती-जुलती योजनाएँ खोजें',
+    gateHeading: 'स्वागत है! जारी रखने के लिए साइन इन करें',
+    gateSubtitle: 'सरकारी योजनाओं और छात्रवृत्तियों की खोज करें जिनके लिए आप पात्र हैं — मुफ़्त और सेकंडों में।',
+    gateGoogle: 'Google से साइन इन करें', gateDivider: 'या ईमेल से जारी रखें',
+    gateEmail: 'ईमेल पता', gateName: 'पूरा नाम',
+    gateContinue: 'स्कीम मैचर पर जारी रखें →',
+    gateGuest: 'अतिथि के रूप में जारी रखें →',
+    gateFooter: '🔒 आपका डेटा केवल इस डिवाइस पर संग्रहीत है।',
+  },
+  mr: {
+    navFind: 'योजना शोधा', navBrowse: 'सर्व पहा', navBookmarks: 'जतन केलेले',
+    formTitle: 'तुम्ही पात्र असलेल्या योजना शोधा',
+    formSubtitle: 'खाली तुमची पात्रता तपशील भरा. आमचे मॅचिंग इंजिन स्कोअर टक्केवारी आणि कारणे सांगते.',
+    lblState: 'राज्य / केंद्रशासित प्रदेश', lblCategory: 'सामाजिक प्रवर्ग', lblGender: 'लिंग',
+    lblAge: 'वय (वर्षे)', lblIncome: 'वार्षिक कौटुंबिक उत्पन्न (₹)',
+    lblDisability: 'दिव्यांग (४०%+ अपंगत्व)?',
+    lblOccupation: 'व्यवसाय', lblEducation: 'सर्वोच्च शिक्षण स्तर',
+    lblDomain: 'आवडीचे क्षेत्र (ऐच्छिक)', btnSearch: 'जुळणाऱ्या योजना शोधा',
+    gateHeading: 'स्वागत आहे! सुरू ठेवण्यासाठी साइन इन करा',
+    gateSubtitle: 'तुम्ही पात्र असलेल्या सरकारी योजना आणि शिष्यवृत्ती शोधा — मोफत आणि सेकंदात.',
+    gateGoogle: 'Google सह साइन इन करा', gateDivider: 'किंवा ईमेलसह सुरू ठेवा',
+    gateEmail: 'ईमेल पत्ता', gateName: 'पूर्ण नाव',
+    gateContinue: 'Scheme Matcher वर सुरू ठेवा →',
+    gateGuest: 'अतिथी म्हणून सुरू ठेवा →',
+    gateFooter: '🔒 तुमचा डेटा फक्त या डिव्हाइसवर साठवला आहे.',
+  },
+  bn: {
+    navFind: 'প্রকল্প খুঁজুন', navBrowse: 'সব দেখুন', navBookmarks: 'সংরক্ষিত',
+    formTitle: 'আপনি যেসব প্রকল্পের জন্য যোগ্য সেগুলি খুঁজুন',
+    formSubtitle: 'নিচে আপনার যোগ্যতার বিবরণ দিন। আমাদের ম্যাচিং ইঞ্জিন স্কোর ও কারণ দেখায়।',
+    lblState: 'রাজ্য / কেন্দ্রশাসিত অঞ্চল', lblCategory: 'সামাজিক শ্রেণি', lblGender: 'লিঙ্গ',
+    lblAge: 'বয়স (বছর)', lblIncome: 'বার্ষিক পারিবারিক আয় (₹)',
+    lblDisability: 'প্রতিবন্ধী (৪০%+)?',
+    lblOccupation: 'পেশা', lblEducation: 'সর্বোচ্চ শিক্ষার স্তর',
+    lblDomain: 'আগ্রহের ক্ষেত্র (ঐচ্ছিক)', btnSearch: 'মিলে যাওয়া প্রকল্প খুঁজুন',
+    gateHeading: 'স্বাগতম! চালিয়ে যেতে সাইন ইন করুন',
+    gateSubtitle: 'আপনি যেসব সরকারি প্রকল্প ও বৃত্তির জন্য যোগ্য তা আবিষ্কার করুন — বিনামূল্যে।',
+    gateGoogle: 'Google দিয়ে সাইন ইন করুন', gateDivider: 'অথবা ইমেইল দিয়ে চালিয়ে যান',
+    gateEmail: 'ইমেইল ঠিকানা', gateName: 'পূর্ণ নাম',
+    gateContinue: 'Scheme Matcher এ চালিয়ে যান →', gateGuest: 'অতিথি হিসেবে চালিয়ে যান →',
+    gateFooter: '🔒 আপনার ডেটা শুধুমাত্র এই ডিভাইসে সংরক্ষিত।',
+  },
+  te: {
+    navFind: 'పథకాలను కనుగొనండి', navBrowse: 'అన్నీ చూడండి', navBookmarks: 'సేవ్ చేసినవి',
+    formTitle: 'మీకు అర్హత ఉన్న పథకాలను కనుగొనండి',
+    formSubtitle: 'క్రింద మీ అర్హత వివరాలను నింపండి. మా మ్యాచింగ్ ఇంజిన్ స్కోర్ శాతం మరియు కారణాలను చూపుతుంది.',
+    lblState: 'రాష్ట్రం / కేంద్ర పాలిత ప్రాంతం', lblCategory: 'సామాజిక వర్గం', lblGender: 'లింగం',
+    lblAge: 'వయస్సు (సంవత్సరాలు)', lblIncome: 'వార్షిక కుటుంబ ఆదాయం (₹)',
+    lblDisability: 'వికలాంగత (40%+)?',
+    lblOccupation: 'వృత్తి', lblEducation: 'అత్యున్నత విద్యా స్థాయి',
+    lblDomain: 'ఆసక్తి రంగం (ఐచ్ఛికం)', btnSearch: 'సరిపోలే పథకాలను కనుగొనండి',
+    gateHeading: 'స్వాగతం! కొనసాగడానికి సైన్ ఇన్ చేయండి',
+    gateSubtitle: 'మీకు అర్హత ఉన్న ప్రభుత్వ పథకాలు మరియు స్కాలర్‌షిప్‌లను కనుగొనండి — ఉచితం.',
+    gateGoogle: 'Googleతో సైన్ ఇన్ చేయండి', gateDivider: 'లేదా ఇమెయిల్‌తో కొనసాగండి',
+    gateEmail: 'ఇమెయిల్ చిరునామా', gateName: 'పూర్తి పేరు',
+    gateContinue: 'Scheme Matcherకి కొనసాగండి →', gateGuest: 'అతిథిగా కొనసాగండి →',
+    gateFooter: '🔒 మీ డేటా ఈ డివైస్‌లో మాత్రమే నిల్వ చేయబడుతుంది.',
+  },
+  ta: {
+    navFind: 'திட்டங்களைக் கண்டறியவும்', navBrowse: 'அனைத்தையும் பார்க்க', navBookmarks: 'சேமித்தவை',
+    formTitle: 'நீங்கள் தகுதிபெறும் திட்டங்களைக் கண்டறியவும்',
+    formSubtitle: 'உங்கள் தகுதி விவரங்களை கீழே நிரப்பவும். எங்கள் மேட்சிங் இன்ஜின் மதிப்பெண் சதவீதத்தைக் காட்டும்.',
+    lblState: 'மாநிலம் / யூனியன் பிரதேசம்', lblCategory: 'சமூகப் பிரிவு', lblGender: 'பாலினம்',
+    lblAge: 'வயது (ஆண்டுகள்)', lblIncome: 'ஆண்டு குடும்ப வருமானம் (₹)',
+    lblDisability: 'மாற்றுத்திறனாளி (40%+)?',
+    lblOccupation: 'தொழில்', lblEducation: 'உயர்ந்த கல்வி நிலை',
+    lblDomain: 'ஆர்வத் துறை (விருப்பம்)', btnSearch: 'பொருந்தும் திட்டங்களைத் தேடு',
+    gateHeading: 'வரவேற்கிறோம்! தொடர உள்நுழையவும்',
+    gateSubtitle: 'தகுதியான அரசாங்க திட்டங்கள் மற்றும் உதவித்தொகைகளை கண்டறியவும் — இலவசம்.',
+    gateGoogle: 'Google மூலம் உள்நுழையவும்', gateDivider: 'அல்லது மின்னஞ்சல் மூலம் தொடரவும்',
+    gateEmail: 'மின்னஞ்சல் முகவரி', gateName: 'முழு பெயர்',
+    gateContinue: 'Scheme Matcher தொடரவும் →', gateGuest: 'விருந்தினராக தொடரவும் →',
+    gateFooter: '🔒 உங்கள் தரவு இந்த சாதனத்தில் மட்டுமே சேமிக்கப்படுகிறது.',
+  },
+  gu: {
+    navFind: 'યોજનાઓ શોધો', navBrowse: 'બધું જુઓ', navBookmarks: 'સાચવેલા',
+    formTitle: 'તમે પાત્ર છો તે યોજનાઓ શોધો',
+    formSubtitle: 'નીચે તમારી પાત્રતાની વિગતો ભરો. અમારું મેચિંગ એન્જિન સ્કોર ટકાવારી અને કારણો બતાવે છે.',
+    lblState: 'રાજ્ય / કેન્દ્રશાસિત પ્રદેશ', lblCategory: 'સામાજિક વર્ગ', lblGender: 'લિંગ',
+    lblAge: 'ઉંમર (વર્ષ)', lblIncome: 'વાર્ષિક કૌટુંબિક આવક (₹)',
+    lblDisability: 'દિવ્યાંગ (40%+)?',
+    lblOccupation: 'વ્યવસાય', lblEducation: 'સર્વોચ્ચ શિક્ષણ સ્તર',
+    lblDomain: 'રુચિનું ક્ષેત્ર (વૈકલ્પિક)', btnSearch: 'મેળ ખાતી યોજનાઓ શોધો',
+    gateHeading: 'સ્વાગત છે! આગળ વધવા માટે સાઇન ઇન કરો',
+    gateSubtitle: 'તમે પાત્ર છો તેવી સરકારી યોજનાઓ અને શિષ્યવૃત્તિ શોધો — મફત.',
+    gateGoogle: 'Google સાથે સાઇન ઇન કરો', gateDivider: 'અથવા ઇમેઇલ સાથે ચાલુ રાખો',
+    gateEmail: 'ઇમેઇલ સરનામું', gateName: 'પૂરું નામ',
+    gateContinue: 'Scheme Matcher પર ચાલુ રાખો →', gateGuest: 'અતિથિ તરીકે ચાલુ રાખો →',
+    gateFooter: '🔒 તમારો ડેટા ફક્ત આ ડિવાઇસ પર સંગ્રહિત છે.',
+  },
+};
+
+// Extended UI strings (header, services, browse, bookmarks, footer, assistant)
+const I18N_EXTRA = {
+  en: {
+    siteSubtitle: 'Government Scheme & Scholarship Matcher for India',
+    navServices: '⚡ Services', navAdmin: 'Admin Portal',
+    statsActive: '🟢 Live Active Schemes', statsDomains: '📂 Welfare Domains', statsReviewed: '🗓️ Last Reviewed',
+    authSignIn: '👤 Student Sign In', authSignOut: 'Sign Out',
+    svcQuickAccess: 'Quick Access', svcTagline: 'Your tools, all in one place',
+    svcMatcher: 'Scholarship Matcher', svcTracker: 'Application Tracker', svcVault: 'Document Vault',
+    svcNotifications: 'Notifications', svcProfile: 'My Profile', svcFeedback: 'Give Feedback',
+    svcDonate: '❤️ Support & Donate', svcVolunteer: '🤝 Volunteer With Us',
+    resultsTitle: 'Your Matches',
+    resultsEmpty: 'Fill out the questionnaire and click search to view matching government schemes.',
+    exportPrint: '📄 Export / Print',
+    browseSearch: 'Search schemes by name, keyword, or ministry...',
+    allDomains: 'All Domains', allLevels: 'All Levels', centralGovt: 'Central Govt', stateGovt: 'State Govt',
+    sortDefault: 'Sort: Default', sortName: 'Name (A → Z)', sortDeadline: 'Deadline (Urgent First)', sortIncome: 'Lowest Income Limit',
+    bookmarksTitle: 'Your Saved Schemes',
+    bookmarksSubtitle: 'Bookmarked schemes are saved to your account or device.',
+    bookmarksEmpty: "You haven't bookmarked any schemes yet.",
+    footerCopyright: '© 2026 Government Scheme Matcher. All Rights Reserved.',
+    footerDisclaimer: '⚠️ Disclaimer: Information provided here is compiled for public awareness and discovery. Always verify specific criteria and submission procedures on the official government portals before applying.',
+    aiSubtitle: 'Voice & Scheme Guidance',
+    aiChipTour: '🧭 Guided Tour', aiChipFind: '🎓 Find Scholarships', aiChipDocs: '📄 NSP Documents',
+    aiChipServices: '⚡ Open Services', aiChipVault: '🔒 Document Vault',
+    listening: 'Listening...',
+  },
+  hi: {
+    siteSubtitle: 'भारत के लिए सरकारी योजना और छात्रवृत्ति मैचर',
+    navServices: '⚡ सेवाएँ', navAdmin: 'एडमिन पोर्टल',
+    statsActive: '🟢 सक्रिय योजनाएँ', statsDomains: '📂 कल्याण क्षेत्र', statsReviewed: '🗓️ अंतिम समीक्षा',
+    authSignIn: '👤 छात्र साइन इन', authSignOut: 'साइन आउट',
+    svcQuickAccess: 'त्वरित पहुँच', svcTagline: 'आपके सभी टूल एक जगह',
+    svcMatcher: 'छात्रवृत्ति मैचर', svcTracker: 'आवेदन ट्रैकर', svcVault: 'दस्तावेज़ वॉल्ट',
+    svcNotifications: 'सूचनाएँ', svcProfile: 'मेरी प्रोफ़ाइल', svcFeedback: 'प्रतिक्रिया दें',
+    svcDonate: '❤️ सहायता और दान', svcVolunteer: '🤝 हमारे साथ स्वयंसेवा करें',
+    resultsTitle: 'आपके मिलान',
+    resultsEmpty: 'प्रश्नावली भरें और मिलती-जुलती सरकारी योजनाएँ देखने के लिए खोज पर क्लिक करें।',
+    exportPrint: '📄 निर्यात / प्रिंट',
+    browseSearch: 'नाम, कीवर्ड या मंत्रालय से योजनाएँ खोजें...',
+    allDomains: 'सभी क्षेत्र', allLevels: 'सभी स्तर', centralGovt: 'केंद्र सरकार', stateGovt: 'राज्य सरकार',
+    sortDefault: 'क्रम: डिफ़ॉल्ट', sortName: 'नाम (A → Z)', sortDeadline: 'समय सीमा (जल्दी पहले)', sortIncome: 'सबसे कम आय सीमा',
+    bookmarksTitle: 'आपकी सहेजी गई योजनाएँ',
+    bookmarksSubtitle: 'सहेजी गई योजनाएँ आपके खाते या डिवाइस में सुरक्षित हैं।',
+    bookmarksEmpty: 'आपने अभी तक कोई योजना सहेजी नहीं है।',
+    footerCopyright: '© 2026 सरकारी योजना मैचर। सर्वाधिकार सुरक्षित।',
+    footerDisclaimer: '⚠️ अस्वीकरण: यहाँ दी गई जानकारी जन जागरूकता के लिए संकलित है। आवेदन करने से पहले आधिकारिक सरकारी पोर्टल पर विवरण सत्यापित करें।',
+    aiSubtitle: 'आवाज़ और योजना मार्गदर्शन',
+    aiChipTour: '🧭 गाइडेड टूर', aiChipFind: '🎓 छात्रवृत्ति खोजें', aiChipDocs: '📄 NSP दस्तावेज़',
+    aiChipServices: '⚡ सेवाएँ खोलें', aiChipVault: '🔒 दस्तावेज़ वॉल्ट',
+    listening: 'सुन रहा है...',
+  },
+  mr: {
+    siteSubtitle: 'भारतासाठी सरकारी योजना आणि शिष्यवृत्ती मॅचर',
+    navServices: '⚡ सेवा', navAdmin: 'अ‍ॅडमिन पोर्टल',
+    statsActive: '🟢 सक्रिय योजना', statsDomains: '📂 कल्याण क्षेत्रे', statsReviewed: '🗓️ शेवटचे पुनरावलोकन',
+    authSignIn: '👤 विद्यार्थी साइन इन', authSignOut: 'साइन आउट',
+    svcQuickAccess: 'जलद प्रवेश', svcTagline: 'तुमची सर्व साधने एकाच ठिकाणी',
+    svcMatcher: 'शिष्यवृत्ती मॅचर', svcTracker: 'अर्ज ट्रॅकर', svcVault: 'दस्तऐवज व्हॉल्ट',
+    svcNotifications: 'सूचना', svcProfile: 'माझी प्रोफाइल', svcFeedback: 'अभिप्राय द्या',
+    svcDonate: '❤️ मदत आणि देणगी', svcVolunteer: '🤝 आमच्यासोबत स्वयंसेवा करा',
+    resultsTitle: 'तुमची जुळणी',
+    resultsEmpty: 'प्रश्नावली भरा आणि जुळणाऱ्या सरकारी योजना पाहण्यासाठी शोधावर क्लिक करा.',
+    exportPrint: '📄 निर्यात / प्रिंट',
+    browseSearch: 'नाव, कीवर्ड किंवा मंत्रालयाने योजना शोधा...',
+    allDomains: 'सर्व क्षेत्रे', allLevels: 'सर्व स्तर', centralGovt: 'केंद्र सरकार', stateGovt: 'राज्य सरकार',
+    sortDefault: 'क्रम: डीफॉल्ट', sortName: 'नाव (A → Z)', sortDeadline: 'अंतिम तारीख (तातडीचे आधी)', sortIncome: 'सर्वात कमी उत्पन्न मर्यादा',
+    bookmarksTitle: 'तुमच्या जतन केलेल्या योजना',
+    bookmarksSubtitle: 'जतन केलेल्या योजना तुमच्या खाते किंवा डिव्हाइसवर साठवल्या जातात.',
+    bookmarksEmpty: 'तुम्ही अजून कोणतीही योजना जतन केलेली नाही.',
+    footerCopyright: '© 2026 सरकारी योजना मॅचर. सर्व हक्क राखीव.',
+    footerDisclaimer: '⚠️ सूचना: येथे दिलेली माहिती जनजागृतीसाठी संकलित केली आहे. अर्ज करण्यापूर्वी अधिकृत सरकारी पोर्टलवर तपशील तपासा.',
+    aiSubtitle: 'आवाज आणि योजना मार्गदर्शन',
+    aiChipTour: '🧭 मार्गदर्शित फेरफटका', aiChipFind: '🎓 शिष्यवृत्ती शोधा', aiChipDocs: '📄 NSP दस्तऐवज',
+    aiChipServices: '⚡ सेवा उघडा', aiChipVault: '🔒 दस्तऐवज व्हॉल्ट',
+    listening: 'ऐकत आहे...',
+  },
+  bn: {
+    siteSubtitle: 'ভারতের জন্য সরকারি প্রকল্প ও বৃত্তি ম্যাচার',
+    navServices: '⚡ সেবা', navAdmin: 'অ্যাডমিন পোর্টাল',
+    statsActive: '🟢 সক্রিয় প্রকল্প', statsDomains: '📂 কল্যাণ ক্ষেত্র', statsReviewed: '🗓️ সর্বশেষ পর্যালোচনা',
+    authSignIn: '👤 শিক্ষার্থী সাইন ইন', authSignOut: 'সাইন আউট',
+    svcQuickAccess: 'দ্রুত প্রবেশ', svcTagline: 'আপনার সব টুল এক জায়গায়',
+    svcMatcher: 'বৃত্তি ম্যাচার', svcTracker: 'আবেদন ট্র্যাকার', svcVault: 'নথি ভান্ডার',
+    svcNotifications: 'বিজ্ঞপ্তি', svcProfile: 'আমার প্রোফাইল', svcFeedback: 'মতামত দিন',
+    svcDonate: '❤️ সহায়তা ও দান', svcVolunteer: '🤝 আমাদের সাথে স্বেচ্ছাসেবা করুন',
+    resultsTitle: 'আপনার মিল',
+    resultsEmpty: 'প্রশ্নাবলী পূরণ করুন এবং মিলে যাওয়া সরকারি প্রকল্প দেখতে অনুসন্ধানে ক্লিক করুন।',
+    exportPrint: '📄 রপ্তানি / প্রিন্ট',
+    browseSearch: 'নাম, কীওয়ার্ড বা মন্ত্রণালয় দিয়ে প্রকল্প খুঁজুন...',
+    allDomains: 'সব ক্ষেত্র', allLevels: 'সব স্তর', centralGovt: 'কেন্দ্রীয় সরকার', stateGovt: 'রাজ্য সরকার',
+    sortDefault: 'ক্রম: ডিফল্ট', sortName: 'নাম (A → Z)', sortDeadline: 'সময়সীমা (জরুরি আগে)', sortIncome: 'সর্বনিম্ন আয়সীমা',
+    bookmarksTitle: 'আপনার সংরক্ষিত প্রকল্প',
+    bookmarksSubtitle: 'সংরক্ষিত প্রকল্প আপনার অ্যাকাউন্ট বা ডিভাইসে রাখা হয়।',
+    bookmarksEmpty: 'আপনি এখনও কোনো প্রকল্প সংরক্ষণ করেননি।',
+    footerCopyright: '© 2026 সরকারি প্রকল্প ম্যাচার। সর্বস্বত্ব সংরক্ষিত।',
+    footerDisclaimer: '⚠️ দাবিত্যাগ: এখানে দেওয়া তথ্য জনসচেতনতার জন্য সংকলিত। আবেদনের আগে অফিসিয়াল সরকারি পোর্টালে যাচাই করুন।',
+    aiSubtitle: 'ভয়েস ও প্রকল্প নির্দেশনা',
+    aiChipTour: '🧭 গাইডেড ট্যুর', aiChipFind: '🎓 বৃত্তি খুঁজুন', aiChipDocs: '📄 NSP নথি',
+    aiChipServices: '⚡ সেবা খুলুন', aiChipVault: '🔒 নথি ভান্ডার',
+    listening: 'শুনছে...',
+  },
+  te: {
+    siteSubtitle: 'భారతదేశానికి ప్రభుత్వ పథకం & స్కాలర్‌షిప్ మ్యాచర్',
+    navServices: '⚡ సేవలు', navAdmin: 'అడ్మిన్ పోర్టల్',
+    statsActive: '🟢 క్రియాశీల పథకాలు', statsDomains: '📂 సంక్షేమ రంగాలు', statsReviewed: '🗓️ చివరి సమీక్ష',
+    authSignIn: '👤 విద్యార్థి సైన్ ఇన్', authSignOut: 'సైన్ అవుట్',
+    svcQuickAccess: 'త్వరిత ప్రవేశం', svcTagline: 'మీ అన్ని సాధనాలు ఒకే చోట',
+    svcMatcher: 'స్కాలర్‌షిప్ మ్యాచర్', svcTracker: 'దరఖాస్తు ట్రాకర్', svcVault: 'పత్రాల వాల్ట్',
+    svcNotifications: 'నోటిఫికేషన్లు', svcProfile: 'నా ప్రొఫైల్', svcFeedback: 'అభిప్రాయం ఇవ్వండి',
+    svcDonate: '❤️ మద్దతు & విరాళం', svcVolunteer: '🤝 మాతో స్వచ్ఛంద సేవ చేయండి',
+    resultsTitle: 'మీ మ్యాచ్‌లు',
+    resultsEmpty: 'ప్రశ్నావళిని నింపి, సరిపోలే ప్రభుత్వ పథకాలను చూడటానికి వెతుకు నొక్కండి.',
+    exportPrint: '📄 ఎగుమతి / ప్రింట్',
+    browseSearch: 'పేరు, కీవర్డ్ లేదా మంత్రిత్వ శాఖ ద్వారా పథకాలను వెతకండి...',
+    allDomains: 'అన్ని రంగాలు', allLevels: 'అన్ని స్థాయిలు', centralGovt: 'కేంద్ర ప్రభుత్వం', stateGovt: 'రాష్ట్ర ప్రభుత్వం',
+    sortDefault: 'క్రమం: డిఫాల్ట్', sortName: 'పేరు (A → Z)', sortDeadline: 'గడువు (అత్యవసరమైనవి ముందు)', sortIncome: 'అత్యల్ప ఆదాయ పరిమితి',
+    bookmarksTitle: 'మీ సేవ్ చేసిన పథకాలు',
+    bookmarksSubtitle: 'సేవ్ చేసిన పథకాలు మీ ఖాతా లేదా పరికరంలో ఉంచబడతాయి.',
+    bookmarksEmpty: 'మీరు ఇంకా ఏ పథకాన్ని సేవ్ చేయలేదు.',
+    footerCopyright: '© 2026 ప్రభుత్వ పథకం మ్యాచర్. సర్వ హక్కులు రక్షితం.',
+    footerDisclaimer: '⚠️ నిరాకరణ: ఇక్కడ ఇచ్చిన సమాచారం ప్రజల అవగాహన కోసం సేకరించబడింది. దరఖాస్తు చేయడానికి ముందు అధికారిక ప్రభుత్వ పోర్టల్‌లో ధృవీకరించండి.',
+    aiSubtitle: 'వాయిస్ & పథక మార్గదర్శనం',
+    aiChipTour: '🧭 గైడెడ్ టూర్', aiChipFind: '🎓 స్కాలర్‌షిప్‌లు వెతకండి', aiChipDocs: '📄 NSP పత్రాలు',
+    aiChipServices: '⚡ సేవలు తెరవండి', aiChipVault: '🔒 పత్రాల వాల్ట్',
+    listening: 'వింటోంది...',
+  },
+  ta: {
+    siteSubtitle: 'இந்தியாவிற்கான அரசு திட்டம் & உதவித்தொகை மேட்சர்',
+    navServices: '⚡ சேவைகள்', navAdmin: 'நிர்வாக போர்ட்டல்',
+    statsActive: '🟢 செயலில் உள்ள திட்டங்கள்', statsDomains: '📂 நலத்துறைகள்', statsReviewed: '🗓️ கடைசி மதிப்பாய்வு',
+    authSignIn: '👤 மாணவர் உள்நுழைவு', authSignOut: 'வெளியேறு',
+    svcQuickAccess: 'விரைவு அணுகல்', svcTagline: 'உங்கள் அனைத்து கருவிகளும் ஒரே இடத்தில்',
+    svcMatcher: 'உதவித்தொகை மேட்சர்', svcTracker: 'விண்ணப்ப டிராக்கர்', svcVault: 'ஆவண காப்பகம்',
+    svcNotifications: 'அறிவிப்புகள்', svcProfile: 'என் சுயவிவரம்', svcFeedback: 'கருத்து தெரிவிக்கவும்',
+    svcDonate: '❤️ ஆதரவு & நன்கொடை', svcVolunteer: '🤝 எங்களுடன் தன்னார்வலராக இணையுங்கள்',
+    resultsTitle: 'உங்கள் பொருத்தங்கள்',
+    resultsEmpty: 'கேள்வித்தாளை நிரப்பி, பொருந்தும் அரசு திட்டங்களைக் காண தேடலை அழுத்தவும்.',
+    exportPrint: '📄 ஏற்றுமதி / அச்சிடு',
+    browseSearch: 'பெயர், முக்கிய சொல் அல்லது அமைச்சகம் மூலம் திட்டங்களைத் தேடுங்கள்...',
+    allDomains: 'அனைத்து துறைகள்', allLevels: 'அனைத்து நிலைகள்', centralGovt: 'மத்திய அரசு', stateGovt: 'மாநில அரசு',
+    sortDefault: 'வரிசை: இயல்பு', sortName: 'பெயர் (A → Z)', sortDeadline: 'காலக்கெடு (அவசரமானவை முதலில்)', sortIncome: 'குறைந்த வருமான வரம்பு',
+    bookmarksTitle: 'நீங்கள் சேமித்த திட்டங்கள்',
+    bookmarksSubtitle: 'சேமித்த திட்டங்கள் உங்கள் கணக்கு அல்லது சாதனத்தில் வைக்கப்படும்.',
+    bookmarksEmpty: 'நீங்கள் இன்னும் எந்த திட்டத்தையும் சேமிக்கவில்லை.',
+    footerCopyright: '© 2026 அரசு திட்ட மேட்சர். அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.',
+    footerDisclaimer: '⚠️ பொறுப்புத் துறப்பு: இங்கு வழங்கப்பட்ட தகவல் பொது விழிப்புணர்வுக்காக தொகுக்கப்பட்டது. விண்ணப்பிக்கும் முன் அதிகாரப்பூர்வ அரசு போர்ட்டலில் சரிபார்க்கவும்.',
+    aiSubtitle: 'குரல் & திட்ட வழிகாட்டல்',
+    aiChipTour: '🧭 வழிகாட்டப்பட்ட சுற்றுலா', aiChipFind: '🎓 உதவித்தொகைகளைத் தேடு', aiChipDocs: '📄 NSP ஆவணங்கள்',
+    aiChipServices: '⚡ சேவைகளைத் திற', aiChipVault: '🔒 ஆவண காப்பகம்',
+    listening: 'கேட்கிறது...',
+  },
+  en: { navInternational: '✈️ International', intlBadge: '🌍 GLOBAL OPPORTUNITIES FOR INDIAN STUDENTS', intlTitle: 'Study Abroad & International Scholarships', intlSubtitle: 'Discover fully-funded and prestigious overseas fellowships, government scholarships, bilateral exchange programs, and study-abroad grants.', intlSearch: 'Search international scholarships by country, degree, or funding...', intlAll: 'All Destinations' },
+  hi: { navInternational: '✈️ अंतर्राष्ट्रीय', intlBadge: '🌍 भारतीय छात्रों के लिए वैश्विक अवसर', intlTitle: 'विदेश में अध्ययन और अंतर्राष्ट्रीय छात्रवृत्तियाँ', intlSubtitle: 'पूर्ण वित्त पोषित और प्रतिष्ठित फेलोशिप, सरकारी छात्रवृत्तियाँ और अध्ययन-अबरोड अनुदान खोजें।', intlSearch: 'देश, डिग्री या फंडिंग से खोजें...', intlAll: 'सभी गंतव्य' },
+  mr: { navInternational: '✈️ आंतरराष्ट्रीय', intlBadge: '🌍 भारतीय विद्यार्थ्यांसाठी जागतिक संधी', intlTitle: 'परदेशात शिक्षण आणि आंतरराष्ट्रीय शिष्यवृत्ती', intlSubtitle: 'पूर्ण अनुदानित आणि प्रतिष्ठित फेलोशिप शोधा.', intlSearch: 'देश, पदवी किंवा निधीद्वारे शोधा...', intlAll: 'सर्व ठिकाणे' },
+  bn: { navInternational: '✈️ আন্তর্জাতিক', intlBadge: '🌍 ভারতীয় শিক্ষার্থীদের জন্য বৈশ্বিক সুযোগ', intlTitle: 'বিদেশে পড়াশোনা ও আন্তর্জাতিক বৃত্তি', intlSubtitle: 'পূর্ণ অর্থায়িত ফেলোশিপ এবং বৃত্তি আবিষ্কার করুন।', intlSearch: 'দেশ, ডিগ্রি বা তহবিল দ্বারা অনুসন্ধান...', intlAll: 'সকল গন্তব্য' },
+  te: { navInternational: '✈️ అంతర్జాతీయ', intlBadge: '🌍 భారతీయ విద్యార్థులకు ప్రపంచ అవకాశాలు', intlTitle: 'విదేశాల్లో చదువు & అంతర్జాతీయ స్కాలర్‌షిప్‌లు', intlSubtitle: 'పూర్తిగా నిధులు పొందే ఫెలోషిప్‌లు మరియు స్కాలర్‌షిప్‌లను కనుగొనండి.', intlSearch: 'దేశం, డిగ్రీ లేదా నిధుల ద్వారా శోధించండి...', intlAll: 'అన్ని గమ్యస్థానాలు' },
+  ta: { navInternational: '✈️ சர்வதேச', intlBadge: '🌍 இந்திய மாணவர்களுக்கான உலகளாவிய வாய்ப்புகள்', intlTitle: 'வெளிநாட்டு படிப்பு & சர்வதேச உதவித்தொகைகள்', intlSubtitle: 'முழு நிதியுதவியுடன் கூடிய உதவித்தொகைகளைக் கண்டறியவும்.', intlSearch: 'நாடு, பட்டம் அல்லது நிதி மூலம் தேடுங்கள்...', intlAll: 'அனைத்து இடங்கள்' },
+  gu: { navInternational: '✈️ આંતરરાષ્ટ્રીય', intlBadge: '🌍 ભારતીય વિદ્યાર્થીઓ માટે વૈશ્વિક તકો', intlTitle: 'પરદેશમાં અભ્યાસ & આંતરરાષ્ટ્રીય શિષ્યવૃત્તિઓ', intlSubtitle: 'પૂર્ણ ભંડોળ સાથેની શિષ્યવૃત્તિઓ શોધો.', intlSearch: 'દેશ, ડિગ્રી અથવા ભંડોળ દ્વારા શોધો...', intlAll: 'બધા ગંતવ્ય' },
+  gu: {
+    siteSubtitle: 'ભારત માટે સરકારી યોજના અને શિષ્યવૃત્તિ મેચર',
+    navServices: '⚡ સેવાઓ', navAdmin: 'એડમિન પોર્ટલ',
+    statsActive: '🟢 સક્રિય યોજનાઓ', statsDomains: '📂 કલ્યાણ ક્ષેત્રો', statsReviewed: '🗓️ છેલ્લી સમીક્ષા',
+    authSignIn: '👤 વિદ્યાર્થી સાઇન ઇન', authSignOut: 'સાઇન આઉટ',
+    svcQuickAccess: 'ઝડપી પ્રવેશ', svcTagline: 'તમારા બધા સાધનો એક જ જગ્યાએ',
+    svcMatcher: 'શિષ્યવૃત્તિ મેચર', svcTracker: 'અરજી ટ્રેકર', svcVault: 'દસ્તાવેજ વોલ્ટ',
+    svcNotifications: 'સૂચનાઓ', svcProfile: 'મારી પ્રોફાઇલ', svcFeedback: 'પ્રતિસાદ આપો',
+    svcDonate: '❤️ સહાય અને દાન', svcVolunteer: '🤝 અમારી સાથે સ્વયંસેવા કરો',
+    resultsTitle: 'તમારા મેળ',
+    resultsEmpty: 'પ્રશ્નાવલી ભરો અને મેળ ખાતી સરકારી યોજનાઓ જોવા શોધ પર ક્લિક કરો.',
+    exportPrint: '📄 નિકાસ / પ્રિન્ટ',
+    browseSearch: 'નામ, કીવર્ડ અથવા મંત્રાલય દ્વારા યોજનાઓ શોધો...',
+    allDomains: 'બધા ક્ષેત્રો', allLevels: 'બધા સ્તરો', centralGovt: 'કેન્દ્ર સરકાર', stateGovt: 'રાજ્ય સરકાર',
+    sortDefault: 'ક્રમ: ડિફોલ્ટ', sortName: 'નામ (A → Z)', sortDeadline: 'સમયમર્યાદા (તાત્કાલિક પહેલા)', sortIncome: 'સૌથી નીચી આવક મર્યાદા',
+    bookmarksTitle: 'તમારી સાચવેલી યોજનાઓ',
+    bookmarksSubtitle: 'સાચવેલી યોજનાઓ તમારા ખાતા અથવા ઉપકરણમાં રાખવામાં આવે છે.',
+    bookmarksEmpty: 'તમે હજી કોઈ યોજના સાચવી નથી.',
+    footerCopyright: '© 2026 સરકારી યોજના મેચર. સર્વ હક્ક સ્વાધીન.',
+    footerDisclaimer: '⚠️ અસ્વીકરણ: અહીં આપેલી માહિતી જનજાગૃતિ માટે સંકલિત છે. અરજી કરતા પહેલા સત્તાવાર સરકારી પોર્ટલ પર ચકાસો.',
+    aiSubtitle: 'અવાજ અને યોજના માર્ગદર્શન',
+    aiChipTour: '🧭 માર્ગદર્શિત પ્રવાસ', aiChipFind: '🎓 શિષ્યવૃત્તિઓ શોધો', aiChipDocs: '📄 NSP દસ્તાવેજો',
+    aiChipServices: '⚡ સેવાઓ ખોલો', aiChipVault: '🔒 દસ્તાવેજ વોલ્ટ',
+    listening: 'સાંભળી રહ્યું છે...',
+  },
+};
+Object.entries(I18N_EXTRA).forEach(([lang, dict]) => Object.assign(I18N[lang], dict));
+
+// Map short code (select value) <-> BCP-47 locale (speech APIs)
+const LANG_LOCALE = {
+  en: 'en-IN', hi: 'hi-IN', mr: 'mr-IN', bn: 'bn-IN',
+  te: 'te-IN', ta: 'ta-IN', gu: 'gu-IN',
+};
+
+function getLang() {
+  return localStorage.getItem('app_lang') || 'en';
+}
+
+function t(key) {
+  const dict = I18N[getLang()] || I18N.en;
+  return dict[key] ?? I18N.en[key] ?? key;
+}
+
+function applyLanguage(lang) {
+  localStorage.setItem('app_lang', lang);
+  document.documentElement.lang = lang;
+
+  // Translate every tagged element
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    const txt = t(el.getAttribute('data-i18n'));
+    if (txt) el.textContent = txt;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    const txt = t(el.getAttribute('data-i18n-placeholder'));
+    if (txt) el.setAttribute('placeholder', txt);
+  });
+
+  // Keep all language selects in sync
+  ['gate-language-select', 'topbar-language-select'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = lang;
+  });
+  const aiSel = document.getElementById('ai-language-select');
+  if (aiSel) aiSel.value = LANG_LOCALE[lang] || 'en-IN';
+}
+
+function initLanguageSelector() {
+  const gateSel = document.getElementById('gate-language-select');
+  const topSel = document.getElementById('topbar-language-select');
+  const aiSel = document.getElementById('ai-language-select');
+
+  const onChange = (lang) => applyLanguage(lang);
+
+  if (gateSel) gateSel.addEventListener('change', (e) => onChange(e.target.value));
+  if (topSel) topSel.addEventListener('change', (e) => onChange(e.target.value));
+  if (aiSel) {
+    aiSel.addEventListener('change', (e) => {
+      // Reverse-map locale -> short code so the whole UI follows the AI dropdown too
+      const short = Object.keys(LANG_LOCALE).find((k) => LANG_LOCALE[k] === e.target.value) || 'en';
+      onChange(short);
+    });
+  }
+
+  applyLanguage(getLang());
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  initLanguageSelector();
   initTabs();
   initServicesDropdown();
   loadConfig();
@@ -2297,14 +2664,17 @@ function speakAIText(text) {
   const clean = text.replace(/[*#_`\[\]()•]/g, ' ').replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
   if (!clean) return;
 
+  const locale = LANG_LOCALE[getLang()] || 'en-IN';
   const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = locale;
   utterance.rate = 1.0;
   utterance.pitch = 1.05;
 
   const voices = window.speechSynthesis.getVoices();
-  const indianVoice = voices.find(v => v.lang === 'en-IN' || v.name.includes('India')) ||
-                      voices.find(v => v.lang.startsWith('en'));
-  if (indianVoice) utterance.voice = indianVoice;
+  const voice = voices.find(v => v.lang === locale) ||
+                voices.find(v => v.lang.split('-')[0] === locale.split('-')[0]) ||
+                voices.find(v => v.name.includes('India'));
+  if (voice) utterance.voice = voice;
 
   window.speechSynthesis.speak(utterance);
 }
@@ -2328,8 +2698,9 @@ function startVoiceRecognition() {
   }
 
   try {
+    const locale = LANG_LOCALE[getLang()] || 'en-IN';
     aiSpeechRecognition = new SpeechRec();
-    aiSpeechRecognition.lang = 'en-IN';
+    aiSpeechRecognition.lang = locale;
     aiSpeechRecognition.continuous = false;
     aiSpeechRecognition.interimResults = false;
 
@@ -2340,6 +2711,11 @@ function startVoiceRecognition() {
       isVoiceListening = true;
       micBtn?.classList.add('listening');
       speechBar?.classList.remove('hidden');
+      const speechText = speechBar?.querySelector('.ai-speech-text');
+      if (speechText) {
+        const short = (locale || 'en-IN').split('-')[0].toUpperCase();
+        speechText.textContent = `${t('listening')} (${short})`;
+      }
     };
 
     aiSpeechRecognition.onresult = (event) => {

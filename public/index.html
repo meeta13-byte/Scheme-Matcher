@@ -14,6 +14,17 @@
   <div id="login-gate" class="login-gate">
     <div class="login-gate-bg"></div>
     <div class="login-gate-card">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+        <select id="gate-language-select" class="ai-lang-select" title="Select Language" aria-label="Select Language" style="padding:4px 8px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.8rem;">
+          <option value="en">English</option>
+          <option value="hi">हिन्दी</option>
+          <option value="mr">मराठी</option>
+          <option value="bn">বাংলা</option>
+          <option value="te">తెలుగు</option>
+          <option value="ta">தமிழ்</option>
+          <option value="gu">ગુજરાતી</option>
+        </select>
+      </div>
       <div class="login-gate-logo">
         <div class="gate-flag">
           <span class="gf-saffron"></span>
@@ -25,8 +36,8 @@
       </div>
 
       <div class="login-gate-body">
-        <h2>Welcome! Please sign in to continue</h2>
-        <p class="login-gate-subtitle">Discover government schemes and scholarships you're eligible for — free, personalised, and in seconds.</p>
+        <h2 id="gate-heading" data-i18n="gateHeading">Welcome! Please sign in to continue</h2>
+        <p class="login-gate-subtitle" id="gate-subtitle" data-i18n="gateSubtitle">Discover government schemes and scholarships you're eligible for — free, personalised, and in seconds.</p>
 
         <!-- Google Sign-In -->
         <div id="gate-google-btn-slot" class="google-auth-slot">
@@ -38,30 +49,30 @@
               <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
               <path fill="none" d="M0 0h48v48H0z"/>
             </svg>
-            <span>Sign in with Google</span>
+            <span id="gate-google-text" data-i18n="gateGoogle">Sign in with Google</span>
           </button>
         </div>
         <div id="gate-google-note" class="hidden" style="display:none !important;"></div>
 
-        <div class="divider-text"><span>OR CONTINUE WITH EMAIL</span></div>
+        <div class="divider-text"><span id="gate-divider" data-i18n="gateDivider">OR CONTINUE WITH EMAIL</span></div>
 
         <form id="gate-login-form">
           <div class="form-group">
-            <label for="gate-email">Email Address</label>
+            <label for="gate-email" id="gate-email-label" data-i18n="gateEmail">Email Address</label>
             <input type="email" id="gate-email" placeholder="yourname@example.com" required autocomplete="email">
           </div>
           <div class="form-group">
-            <label for="gate-name">Full Name</label>
+            <label for="gate-name" data-i18n="gateName">Full Name</label>
             <input type="text" id="gate-name" placeholder="Your Full Name" required autocomplete="name">
           </div>
-          <button type="submit" class="btn btn-primary btn-block" id="gate-login-btn">Continue to Scheme Matcher →</button>
-          <button type="button" class="btn btn-secondary btn-block" id="gate-skip-btn" style="margin-top: 10px;">Continue as Guest (Explore Portal) →</button>
+          <button type="submit" class="btn btn-primary btn-block" id="gate-login-btn"><span data-i18n="gateContinue">Continue to Scheme Matcher →</span></button>
+          <button type="button" class="btn btn-secondary btn-block" id="gate-skip-btn" style="margin-top: 10px;"><span data-i18n="gateGuest">Continue as Guest (Explore Portal) →</span></button>
           <div id="gate-login-error" class="error-text hidden"></div>
         </form>
       </div>
 
       <div class="login-gate-footer">
-        <p>🔒 Your data is stored only on this device. No spam, no tracking.</p>
+        <p id="gate-footer" data-i18n="gateFooter">🔒 Your data is stored only on this device. No spam, no tracking.</p>
       </div>
     </div>
   </div>
@@ -74,59 +85,69 @@
         <span class="flag-stripe stripe-green"></span>
         <div class="logo-text">
           <h1>Scheme Matcher</h1>
-          <p>Government Scheme & Scholarship Matcher for India</p>
+          <p data-i18n="siteSubtitle">Government Scheme & Scholarship Matcher for India</p>
         </div>
       </div>
 
       <nav class="nav" aria-label="Main Navigation">
-        <button class="nav-btn active" data-tab="match-tab" id="nav-match">Find Schemes</button>
-        <button class="nav-btn" data-tab="browse-tab" id="nav-browse">Browse All</button>
-        <button class="nav-btn" data-tab="bookmarks-tab" id="nav-bookmarks">Bookmarks (<span id="bookmark-count">0</span>)</button>
+        <button class="nav-btn active" data-tab="match-tab" id="nav-match" data-i18n="navFind">Find Schemes</button>
+        <button class="nav-btn" data-tab="browse-tab" id="nav-browse" data-i18n="navBrowse">Browse All</button>
+        <button class="nav-btn" data-tab="international-tab" id="nav-international" data-i18n="navInternational">✈️ International</button>
+        <button class="nav-btn" data-tab="bookmarks-tab" id="nav-bookmarks"><span data-i18n="navBookmarks">Bookmarks</span> (<span id="bookmark-count">0</span>)</button>
         
         <!-- SERVICES FANCY POP-OUT PANEL -->
         <div class="services-dropdown" id="services-dropdown-container">
           <button class="nav-btn services-btn" id="btn-services-menu" aria-haspopup="true" aria-expanded="false">
-            ⚡ Services <span class="svc-chevron">▾</span>
+            <span data-i18n="navServices">⚡ Services</span> <span class="svc-chevron">▾</span>
           </button>
           <div class="services-menu hidden" id="services-menu" role="menu">
             <div class="svc-menu-header">
-              <span class="svc-menu-title">Quick Access</span>
-              <span class="svc-menu-tagline">Your tools, all in one place</span>
+              <span class="svc-menu-title" data-i18n="svcQuickAccess">Quick Access</span>
+              <span class="svc-menu-tagline" data-i18n="svcTagline">Your tools, all in one place</span>
             </div>
             <div class="svc-grid">
               <button class="svc-card" id="svc-match" role="menuitem">
                 <span class="svc-card-icon">🎓</span>
-                <span class="svc-card-label">Scholarship<br>Matcher</span>
+                <span class="svc-card-label" data-i18n="svcMatcher">Scholarship Matcher</span>
               </button>
               <button class="svc-card" id="svc-tracker" role="menuitem">
                 <span class="svc-card-icon">📝</span>
-                <span class="svc-card-label">Application<br>Tracker</span>
+                <span class="svc-card-label" data-i18n="svcTracker">Application Tracker</span>
               </button>
               <button class="svc-card" id="svc-vault" role="menuitem">
                 <span class="svc-card-icon">📁</span>
-                <span class="svc-card-label">Document<br>Vault</span>
+                <span class="svc-card-label" data-i18n="svcVault">Document Vault</span>
               </button>
               <button class="svc-card" id="svc-alerts" role="menuitem">
                 <span class="svc-card-icon">🔔</span>
-                <span class="svc-card-label">Notifications<span id="menu-notif-badge" class="notif-badge hidden">0</span></span>
+                <span class="svc-card-label"><span data-i18n="svcNotifications">Notifications</span><span id="menu-notif-badge" class="notif-badge hidden">0</span></span>
               </button>
               <button class="svc-card" id="svc-profile" role="menuitem">
                 <span class="svc-card-icon">👤</span>
-                <span class="svc-card-label">My<br>Profile</span>
+                <span class="svc-card-label" data-i18n="svcProfile">My Profile</span>
               </button>
               <button class="svc-card" id="svc-feedback" role="menuitem">
                 <span class="svc-card-icon">💬</span>
-                <span class="svc-card-label">Give<br>Feedback</span>
+                <span class="svc-card-label" data-i18n="svcFeedback">Give Feedback</span>
               </button>
             </div>
             <div class="svc-menu-footer">
-              <button class="svc-footer-btn" id="svc-donation" role="menuitem">❤️ Support &amp; Donate</button>
-              <button class="svc-footer-btn" id="svc-volunteer" role="menuitem">🤝 Volunteer With Us</button>
+              <button class="svc-footer-btn" id="svc-donation" role="menuitem"><span data-i18n="svcDonate">❤️ Support &amp; Donate</span></button>
+              <button class="svc-footer-btn" id="svc-volunteer" role="menuitem"><span data-i18n="svcVolunteer">🤝 Volunteer With Us</span></button>
             </div>
           </div>
         </div>
 
-        <button class="nav-btn" data-tab="admin-tab" id="nav-admin">Admin Portal</button>
+        <button class="nav-btn" data-tab="admin-tab" id="nav-admin"><span data-i18n="navAdmin">Admin Portal</span></button>
+        <select id="topbar-language-select" class="ai-lang-select" title="Select Language" aria-label="Select Language" style="padding:6px 10px;border-radius:8px;border:1px solid #cbd5e1;font-size:0.85rem;margin-left:auto;background:#fff;cursor:pointer;">
+          <option value="en">English</option>
+          <option value="hi">हिन्दी</option>
+          <option value="mr">मराठी</option>
+          <option value="bn">বাংলা</option>
+          <option value="te">తెలుగు</option>
+          <option value="ta">தமிழ்</option>
+          <option value="gu">ગુજરાતી</option>
+        </select>
       </nav>
 
       <!-- USER AUTHENTICATION PILL -->
@@ -136,7 +157,7 @@
           <div id="g_id_onload"></div>
           <div id="g_id_signin"></div>
           <button id="btn-login-modal" class="btn btn-sm btn-outline-light" title="Sign in or try local demo">
-            👤 Student Sign In
+            <span data-i18n="authSignIn">👤 Student Sign In</span>
           </button>
         </div>
 
@@ -151,7 +172,7 @@
             🔔<span id="bell-notif-badge" class="notif-badge hidden">0</span>
           </button>
           <button id="btn-user-logout" class="btn btn-sm btn-outline-light" title="Sign out">
-            Sign Out
+            <span data-i18n="authSignOut">Sign Out</span>
           </button>
         </div>
       </div>
@@ -161,9 +182,9 @@
   <!-- STATS BAR -->
   <div class="stats-bar">
     <div class="container stats-container">
-      <span class="stat-item">🟢 Live Active Schemes: <strong id="stat-active-count">0</strong></span>
-      <span class="stat-item">📂 Welfare Domains: <strong id="stat-domain-count">0</strong></span>
-      <span class="stat-item">🗓️ Last Reviewed: <strong id="stat-last-reviewed">-</strong></span>
+      <span class="stat-item"><span data-i18n="statsActive">🟢 Live Active Schemes</span>: <strong id="stat-active-count">0</strong></span>
+      <span class="stat-item"><span data-i18n="statsDomains">📂 Welfare Domains</span>: <strong id="stat-domain-count">0</strong></span>
+      <span class="stat-item"><span data-i18n="statsReviewed">🗓️ Last Reviewed</span>: <strong id="stat-last-reviewed">-</strong></span>
     </div>
   </div>
 
@@ -176,8 +197,8 @@
         <div class="card form-card">
           <div class="form-header-flex">
             <div>
-              <h2>Find Schemes You Qualify For</h2>
-              <p class="subtitle">Fill out your eligibility details below. Our deterministic matching engine calculates score percentages and reasons.</p>
+              <h2 data-i18n="formTitle">Find Schemes You Qualify For</h2>
+              <p class="subtitle" data-i18n="formSubtitle">Fill out your eligibility details below. Our deterministic matching engine calculates score percentages and reasons.</p>
             </div>
             <div style="display: flex; gap: 8px;">
               <button type="button" id="btn-autofill-profile" class="btn btn-secondary btn-sm" title="Populate fields from your saved profile">
@@ -192,13 +213,13 @@
           <form id="matcher-form">
             <div class="form-row">
               <div class="form-group">
-                <label for="state">State / UT</label>
+                <label for="state" data-i18n="lblState">State / UT</label>
                 <select id="state" name="state" required>
                   <!-- Populated dynamically -->
                 </select>
               </div>
               <div class="form-group">
-                <label for="category">Social Category</label>
+                <label for="category" data-i18n="lblCategory">Social Category</label>
                 <select id="category" name="category" required>
                   <option value="All">All / General</option>
                   <option value="SC">Scheduled Caste (SC)</option>
@@ -211,7 +232,7 @@
 
             <div class="form-row">
               <div class="form-group">
-                <label for="gender">Gender</label>
+                <label for="gender" data-i18n="lblGender">Gender</label>
                 <select id="gender" name="gender" required>
                   <option value="Any">Any Gender</option>
                   <option value="Male">Male</option>
@@ -219,18 +240,18 @@
                 </select>
               </div>
               <div class="form-group">
-                <label for="age">Age (Years)</label>
+                <label for="age" data-i18n="lblAge">Age (Years)</label>
                 <input type="number" id="age" name="age" min="0" max="120" placeholder="e.g. 20" required>
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-group">
-                <label for="income">Annual Household Income (₹)</label>
+                <label for="income" data-i18n="lblIncome">Annual Household Income (₹)</label>
                 <input type="number" id="income" name="income" min="0" placeholder="e.g. 150000" required>
               </div>
               <div class="form-group">
-                <label>Specially-Abled (Disability 40%+)?</label>
+                <label data-i18n="lblDisability">Specially-Abled (Disability 40%+)?</label>
                 <div class="radio-group">
                   <label><input type="radio" name="disability" value="yes"> Yes</label>
                   <label><input type="radio" name="disability" value="no" checked> No</label>
@@ -240,7 +261,7 @@
 
             <div class="form-row">
               <div class="form-group">
-                <label for="occupation">Occupation</label>
+                <label for="occupation" data-i18n="lblOccupation">Occupation</label>
                 <select id="occupation" name="occupation" required>
                   <option value="Any">Any / Other</option>
                   <option value="Student">Student</option>
@@ -253,7 +274,7 @@
                 </select>
               </div>
               <div class="form-group">
-                <label for="education">Highest Education Level</label>
+                <label for="education" data-i18n="lblEducation">Highest Education Level</label>
                 <select id="education" name="education" required>
                   <option value="Any">Any / Other</option>
                   <option value="School">School Education (Class 1-12)</option>
@@ -267,7 +288,7 @@
             </div>
 
             <div class="form-group">
-              <label for="domain">Domain of Interest (Optional)</label>
+              <label for="domain" data-i18n="lblDomain">Domain of Interest (Optional)</label>
               <select id="domain" name="domain">
                 <option value="">All Welfare Domains</option>
                 <!-- Populated dynamically -->
@@ -275,7 +296,7 @@
             </div>
 
             <button type="submit" id="btn-search-match" class="btn btn-primary btn-block">
-              Search Matching Schemes
+              <span data-i18n="btnSearch">Search Matching Schemes</span>
             </button>
           </form>
         </div>
@@ -283,17 +304,17 @@
         <div class="results-area">
           <div class="results-header">
             <div>
-              <h2>Your Matches</h2>
+              <h2 data-i18n="resultsTitle">Your Matches</h2>
               <span id="results-count" class="badge">0 schemes found</span>
             </div>
             <button type="button" id="btn-export-results" class="btn btn-secondary btn-sm hidden" title="Export or print eligible schemes">
-              📄 Export / Print
+              <span data-i18n="exportPrint">📄 Export / Print</span>
             </button>
           </div>
           <div id="results-list" class="results-list">
             <div class="empty-state">
               <span class="icon">🔍</span>
-              <p>Fill out the questionnaire and click search to view matching government schemes.</p>
+              <p data-i18n="resultsEmpty">Fill out the questionnaire and click search to view matching government schemes.</p>
             </div>
           </div>
         </div>
@@ -303,24 +324,52 @@
     <!-- TAB 2: BROWSE ALL -->
     <section id="browse-tab" class="tab-content" aria-labelledby="nav-browse">
       <div class="search-filters">
-        <input type="text" id="search-q" placeholder="Search schemes by name, keyword, or ministry..." aria-label="Search schemes">
+        <input type="text" id="search-q" data-i18n-placeholder="browseSearch" placeholder="Search schemes by name, keyword, or ministry..." aria-label="Search schemes">
         <select id="filter-domain" aria-label="Filter by domain">
-          <option value="">All Domains</option>
+          <option value="" data-i18n="allDomains">All Domains</option>
           <!-- Populated dynamically -->
         </select>
         <select id="filter-level" aria-label="Filter by administration level">
-          <option value="">All Levels</option>
-          <option value="Central">Central Govt</option>
-          <option value="State">State Govt</option>
+          <option value="" data-i18n="allLevels">All Levels</option>
+          <option value="Central" data-i18n="centralGovt">Central Govt</option>
+          <option value="State" data-i18n="stateGovt">State Govt</option>
         </select>
         <select id="browse-sort" aria-label="Sort schemes">
-          <option value="default">Sort: Default</option>
-          <option value="name-asc">Name (A → Z)</option>
-          <option value="deadline">Deadline (Urgent First)</option>
-          <option value="income">Lowest Income Limit</option>
+          <option value="default" data-i18n="sortDefault">Sort: Default</option>
+          <option value="name-asc" data-i18n="sortName">Name (A → Z)</option>
+          <option value="deadline" data-i18n="sortDeadline">Deadline (Urgent First)</option>
+          <option value="income" data-i18n="sortIncome">Lowest Income Limit</option>
         </select>
       </div>
       <div id="browse-list" class="schemes-grid">
+        <!-- Filled dynamically -->
+      </div>
+    </section>
+
+
+    <!-- TAB: INTERNATIONAL SCHEMES -->
+    <section id="international-tab" class="tab-content" aria-labelledby="nav-international">
+      <div class="international-hero card">
+        <div class="intl-hero-content">
+          <span class="intl-badge" data-i18n="intlBadge">🌍 GLOBAL OPPORTUNITIES FOR INDIAN STUDENTS</span>
+          <h2 data-i18n="intlTitle">Study Abroad &amp; International Scholarships</h2>
+          <p data-i18n="intlSubtitle">Discover fully-funded and prestigious overseas fellowships, government scholarships, bilateral exchange programs, and study-abroad grants in the UK, USA, Germany, Japan, Europe, and worldwide.</p>
+        </div>
+      </div>
+      <div class="search-filters">
+        <input type="text" id="intl-search-q" data-i18n-placeholder="intlSearch" placeholder="Search international scholarships by country, degree, or funding..." aria-label="Search international schemes">
+        <select id="intl-filter-country" aria-label="Filter by destination country">
+          <option value="" data-i18n="intlAll">All Destinations</option>
+          <option value="United Kingdom">🇬🇧 United Kingdom</option>
+          <option value="United States">🇺🇸 United States</option>
+          <option value="Germany">🇩🇪 Germany</option>
+          <option value="Japan">🇯🇵 Japan</option>
+          <option value="European Union">🇪🇺 European Union</option>
+          <option value="Commonwealth">🌐 Commonwealth Countries</option>
+          <option value="Global">🌏 Global / Top-500</option>
+        </select>
+      </div>
+      <div id="international-list" class="schemes-grid">
         <!-- Filled dynamically -->
       </div>
     </section>
@@ -329,14 +378,14 @@
     <section id="bookmarks-tab" class="tab-content" aria-labelledby="nav-bookmarks">
       <div class="results-header">
         <div>
-          <h2>Your Saved Schemes</h2>
-          <p id="bookmarks-subtitle">Bookmarked schemes are saved to your account or device.</p>
+          <h2 data-i18n="bookmarksTitle">Your Saved Schemes</h2>
+          <p id="bookmarks-subtitle" data-i18n="bookmarksSubtitle">Bookmarked schemes are saved to your account or device.</p>
         </div>
       </div>
       <div id="bookmarks-list" class="schemes-grid">
         <div class="empty-state">
           <span class="icon">🔖</span>
-          <p>You haven't bookmarked any schemes yet.</p>
+          <p data-i18n="bookmarksEmpty">You haven't bookmarked any schemes yet.</p>
         </div>
       </div>
     </section>
@@ -1039,8 +1088,8 @@
   <!-- FOOTER -->
   <footer class="footer">
     <div class="container footer-container">
-      <p>&copy; 2026 Government Scheme Matcher. All Rights Reserved.</p>
-      <p class="disclaimer">⚠️ Disclaimer: Information provided here is compiled for public awareness and discovery. Always verify specific criteria and submission procedures on the official government portals before applying.</p>
+      <p data-i18n="footerCopyright">&copy; 2026 Government Scheme Matcher. All Rights Reserved.</p>
+      <p class="disclaimer" data-i18n="footerDisclaimer">⚠️ Disclaimer: Information provided here is compiled for public awareness and discovery. Always verify specific criteria and submission procedures on the official government portals before applying.</p>
     </div>
   </footer>
 
@@ -1064,10 +1113,19 @@
           </div>
           <div class="ai-header-info">
             <h3 id="ai-chat-title">SchemeMitra AI</h3>
-            <span class="ai-subtitle">Voice &amp; Scheme Guidance</span>
+            <span class="ai-subtitle" data-i18n="aiSubtitle">Voice &amp; Scheme Guidance</span>
           </div>
         </div>
         <div class="ai-header-actions">
+          <select id="ai-language-select" class="ai-lang-select" title="Select Language" aria-label="Select Language" style="padding:4px 6px;border-radius:6px;border:1px solid #cbd5e1;font-size:0.75rem;cursor:pointer;">
+            <option value="en-IN">English</option>
+            <option value="hi-IN">हिन्दी</option>
+            <option value="mr-IN">मराठी</option>
+            <option value="bn-IN">বাংলা</option>
+            <option value="te-IN">తెలుగు</option>
+            <option value="ta-IN">தமிழ்</option>
+            <option value="gu-IN">ગુજરાતી</option>
+          </select>
           <button type="button" id="ai-voice-toggle" class="ai-icon-btn active" title="Toggle Voice Output (Speech Narration)" aria-label="Toggle Voice Output">🔊</button>
           <button type="button" id="ai-clear-btn" class="ai-icon-btn" title="Clear Chat History" aria-label="Clear Chat History">🗑️</button>
           <button type="button" id="ai-close-btn" class="ai-icon-btn" title="Close Assistant" aria-label="Close Assistant">&times;</button>
@@ -1076,11 +1134,11 @@
 
       <!-- Quick Action Chips -->
       <div id="ai-suggestion-chips" class="ai-chips-area">
-        <button type="button" class="ai-chip" data-prompt="Start guided tour">🧭 Guided Tour</button>
-        <button type="button" class="ai-chip" data-prompt="Find scholarships for me">🎓 Find Scholarships</button>
-        <button type="button" class="ai-chip" data-prompt="What documents do I need for NSP?">📄 NSP Documents</button>
-        <button type="button" class="ai-chip" data-prompt="Open Services menu">⚡ Open Services</button>
-        <button type="button" class="ai-chip" data-prompt="Open Document Vault">🔒 Document Vault</button>
+        <button type="button" class="ai-chip" data-prompt="Start guided tour" data-i18n="aiChipTour">🧭 Guided Tour</button>
+        <button type="button" class="ai-chip" data-prompt="Find scholarships for me" data-i18n="aiChipFind">🎓 Find Scholarships</button>
+        <button type="button" class="ai-chip" data-prompt="What documents do I need for NSP?" data-i18n="aiChipDocs">📄 NSP Documents</button>
+        <button type="button" class="ai-chip" data-prompt="Open Services menu" data-i18n="aiChipServices">⚡ Open Services</button>
+        <button type="button" class="ai-chip" data-prompt="Open Document Vault" data-i18n="aiChipVault">🔒 Document Vault</button>
       </div>
 
       <!-- Messages Area -->
@@ -1099,7 +1157,7 @@
         <div class="ai-sound-waves">
           <span></span><span></span><span></span><span></span><span></span>
         </div>
-        <span class="ai-speech-text">Listening... speak in English or Hindi</span>
+        <span class="ai-speech-text" data-i18n="listening">Listening...</span>
         <button type="button" id="ai-speech-cancel" class="ai-speech-stop-btn">✕</button>
       </div>
 
