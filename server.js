@@ -736,7 +736,7 @@ function generateAIResponse(query) {
   // 1. GREETINGS & INTRO
   if (!q || /^(hi|hello|hey|namaste|greetings|good\s+(morning|afternoon|evening)|who are you|kya haal hai|help me)/i.test(q)) {
     return {
-      reply: `**Namaste! I am SchemeMitra**, your AI & Voice Guide for Indian government welfare schemes and scholarships.\n\nHere is what I can do for you:\n- 🎓 **Find Scholarships**: Tell me your state, social category, or current course.\n- 🌾 **Sector Schemes**: Ask about farming, healthcare, housing, business loans, or pensions.\n- 🧭 **Guided Tour**: Say *"Start guided tour"* to walk through all features.\n- 📄 **Document Checklist**: Ask about documents required for NSP or state portals.\n- ⚡ **Portal Shortcuts**: Say *"Open tracker"*, *"Open vault"*, or *"Show services"*.`,
+      reply: `**Namaste! I am SchemeMitra**, your AI & Voice Assistant for Indian government welfare schemes and scholarships.\n\nHere is what I can do for you:\n- 🎯 **Find Scholarships**: Tell me your state, category, or course.\n- 🧭 **Guide You**: Say *\"Start guided tour\"* to explore all features.\n- 📂 **Documents**: Ask about required certificates for any scheme.\n- 🚀 **Quick Actions**: Say *\"Open tracker\"*, *\"Open vault\"*, or *\"Show services\"*.`,
       voiceText: "Namaste! I am SchemeMitra, your AI and Voice Guide. You can ask me to find scholarships, check welfare schemes for farmers or women, or say 'Start guided tour' to explore the portal.",
       action: null,
       schemes: [],
